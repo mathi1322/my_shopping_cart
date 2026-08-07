@@ -12,6 +12,7 @@ import { createTestDb, truncateAll, seedTestUser } from '../setupDb';
 const { db, client } = createTestDb();
 const cartRepository = new DrizzleCartRepository(db);
 const productRepository = new DrizzleProductRepository(db);
+let buyerId: string;
 
 async function seedProduct() {
   const seller = await seedTestUser(db, 'seller');
@@ -29,6 +30,7 @@ async function seedProduct() {
 describe('DrizzleCartRepository', () => {
   beforeEach(async () => {
     await truncateAll(db);
+    buyerId = (await seedTestUser(db, 'buyer')).id;
   });
 
   afterAll(async () => {
@@ -39,18 +41,26 @@ describe('DrizzleCartRepository', () => {
     expect(await cartRepository.findById(CartId.create())).toBeNull();
   });
 
-  it('saves an empty cart and retrieves it', async () => {
-    const cart = Cart.create();
+  it('returns null for a user with no cart', async () => {
+    expect(await cartRepository.findByUserId(buyerId)).toBeNull();
+  });
+
+  it('saves an empty cart and retrieves it by id and by user', async () => {
+    const cart = Cart.create(buyerId);
     await cartRepository.save(cart);
 
-    const found = await cartRepository.findById(cart.id);
-    expect(found).not.toBeNull();
-    expect(found?.isEmpty).toBe(true);
+    const foundById = await cartRepository.findById(cart.id);
+    expect(foundById).not.toBeNull();
+    expect(foundById?.isEmpty).toBe(true);
+    expect(foundById?.userId).toBe(buyerId);
+
+    const foundByUser = await cartRepository.findByUserId(buyerId);
+    expect(foundByUser?.id.equals(cart.id)).toBe(true);
   });
 
   it('persists cart items and reconstructs totals on read', async () => {
     const product = await seedProduct();
-    const cart = Cart.create();
+    const cart = Cart.create(buyerId);
     cart.addItem({
       productId: product.id,
       productName: product.name,
@@ -69,7 +79,7 @@ describe('DrizzleCartRepository', () => {
 
   it('overwrites the item set on subsequent saves (remove reflected)', async () => {
     const product = await seedProduct();
-    const cart = Cart.create();
+    const cart = Cart.create(buyerId);
     cart.addItem({
       productId: product.id,
       productName: product.name,

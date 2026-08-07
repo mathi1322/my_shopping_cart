@@ -16,6 +16,7 @@ function itemToDomain(row: CartItemRow): CartItem {
   return new CartItem({
     productId: ProductId.fromString(row.productId),
     productName: row.productName,
+    productImage: row.productImage,
     vendorId: VendorId.fromString(row.vendorId),
     unitPrice: Money.fromCents(row.unitPriceInCents, row.currency),
     quantity: Quantity.of(row.quantity),
@@ -31,17 +32,27 @@ export class DrizzleCartRepository implements CartRepository {
       .from(carts)
       .where(eq(carts.id, id.toString()))
       .limit(1);
-    if (!cartRow) {
-      return null;
-    }
+    return cartRow ? this.hydrate(cartRow) : null;
+  }
 
+  async findByUserId(userId: string): Promise<Cart | null> {
+    const [cartRow] = await this.db
+      .select()
+      .from(carts)
+      .where(eq(carts.userId, userId))
+      .limit(1);
+    return cartRow ? this.hydrate(cartRow) : null;
+  }
+
+  private async hydrate(cartRow: typeof carts.$inferSelect): Promise<Cart> {
     const itemRows = await this.db
       .select()
       .from(cartItems)
-      .where(eq(cartItems.cartId, id.toString()));
+      .where(eq(cartItems.cartId, cartRow.id));
 
     return Cart.reconstitute({
       id: CartId.fromString(cartRow.id),
+      userId: cartRow.userId,
       items: itemRows.map(itemToDomain),
       createdAt: cartRow.createdAt,
       updatedAt: cartRow.updatedAt,
@@ -54,6 +65,7 @@ export class DrizzleCartRepository implements CartRepository {
         .insert(carts)
         .values({
           id: cart.id.toString(),
+          userId: cart.userId,
           createdAt: cart.createdAt,
           updatedAt: cart.updatedAt,
         })
@@ -70,6 +82,7 @@ export class DrizzleCartRepository implements CartRepository {
             cartId: cart.id.toString(),
             productId: item.productId.toString(),
             productName: item.productName,
+            productImage: item.productImage,
             vendorId: item.vendorId.toString(),
             unitPriceInCents: item.unitPrice.cents,
             currency: item.unitPrice.currencyCode,

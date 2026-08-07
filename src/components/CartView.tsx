@@ -4,6 +4,7 @@ import { placeholderTile } from '../lib/ui/placeholderTile';
 interface CartItem {
   productId: string;
   productName: string;
+  productImage: string | null;
   vendorId: string;
   unitPriceInCents: number;
   quantity: number;
@@ -18,7 +19,7 @@ interface CartData {
 }
 
 function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(cents / 100);
 }
 
 export default function CartView() {
@@ -85,7 +86,7 @@ export default function CartView() {
         <p class="text-lg font-medium text-slate-700">Your cart is empty</p>
         <a
           href="/"
-          class="mt-3 inline-block rounded-sm bg-[#2874f0] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1f5bc4]"
+          class="mt-3 inline-block rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
         >
           Shop now
         </a>
@@ -111,16 +112,26 @@ export default function CartView() {
             const isPending = pendingProductId === item.productId;
             return (
               <li key={item.productId} class="flex gap-4 p-4">
-                <div
-                  class="flex h-16 w-16 shrink-0 items-center justify-center rounded text-xl font-bold text-slate-500/70 sm:h-20 sm:w-20"
-                  style={{ background: tile.background }}
+                <a
+                  href={`/products/${item.productId}`}
+                  class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded text-xl font-bold text-slate-500/70 sm:h-20 sm:w-20"
+                  style={item.productImage ? undefined : { background: tile.background }}
                 >
-                  {tile.glyph}
-                </div>
+                  {item.productImage ? (
+                    <img src={item.productImage} alt="" class="h-full w-full object-cover" />
+                  ) : (
+                    tile.glyph
+                  )}
+                </a>
 
                 <div class="flex min-w-0 flex-1 flex-col justify-between">
                   <div>
-                    <p class="truncate font-medium text-slate-800">{item.productName}</p>
+                    <a
+                      href={`/products/${item.productId}`}
+                      class="truncate font-medium text-slate-800 hover:text-brand hover:underline"
+                    >
+                      {item.productName}
+                    </a>
                     <p class="text-xs text-slate-400">Seller: {item.vendorId}</p>
                     <p class="mt-1 text-base font-bold text-slate-900">
                       {formatMoney(item.unitPriceInCents, cart.currency)}
@@ -152,7 +163,7 @@ export default function CartView() {
                     <button
                       onClick={() => removeItem(item.productId)}
                       disabled={isPending}
-                      class="text-sm font-semibold text-slate-500 uppercase hover:text-[#2874f0] disabled:opacity-50"
+                      class="text-sm font-semibold text-slate-500 uppercase hover:text-brand disabled:opacity-50"
                     >
                       Remove
                     </button>
@@ -190,7 +201,7 @@ export default function CartView() {
           type="button"
           disabled
           title="Checkout is out of scope for this demo — see ARCHITECTURE.md"
-          class="mt-2 w-full cursor-not-allowed rounded-sm bg-[#fb641b] px-4 py-3 text-sm font-bold tracking-wide text-white uppercase opacity-60"
+          class="mt-2 w-full cursor-not-allowed rounded-full bg-brand px-4 py-3 text-sm font-bold tracking-wide text-white uppercase opacity-60"
         >
           Place Order
         </button>

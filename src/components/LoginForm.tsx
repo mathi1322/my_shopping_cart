@@ -1,6 +1,16 @@
 import { useState } from 'preact/hooks';
 
-export default function LoginForm() {
+export interface AuthUser {
+  id: string;
+  email: string;
+  role: string;
+}
+
+interface Props {
+  onSuccess?: (user: AuthUser) => void;
+}
+
+export default function LoginForm({ onSuccess }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +31,11 @@ export default function LoginForm() {
         setError(data.error?.message ?? 'Login failed');
         return;
       }
-      window.location.assign('/');
+      if (onSuccess) {
+        onSuccess(data);
+      } else {
+        window.location.assign('/');
+      }
     } catch {
       setError('Network error — please try again');
     } finally {
@@ -31,7 +45,7 @@ export default function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} class="mx-auto mt-10 max-w-sm rounded bg-white p-6 shadow-sm">
-      <h1 class="mb-4 text-xl font-bold text-slate-800">Login</h1>
+      <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">Login</h1>
       {error && <p class="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <label class="mb-3 block text-sm">
@@ -59,14 +73,14 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        class="w-full rounded-sm bg-[#2874f0] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1f5bc4] disabled:opacity-60"
+        class="w-full rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
       >
         {loading ? 'Logging in…' : 'Login'}
       </button>
 
       <p class="mt-4 text-center text-sm text-slate-500">
         New here?{' '}
-        <a href="/register" class="font-medium text-[#2874f0] hover:underline">
+        <a href="/register" class="font-medium text-brand hover:underline">
           Create an account
         </a>
       </p>

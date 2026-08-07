@@ -13,3 +13,10 @@ export class UserRegistered implements DomainEvent {
     readonly role: UserRole,
   ) {}
 }
+
+export class UserProfileUpdated implements DomainEvent {
+  readonly name = 'user.profile_updated';
+  readonly occurredAt = new Date();
+
+  constructor(readonly userId: UserId) {}
+}

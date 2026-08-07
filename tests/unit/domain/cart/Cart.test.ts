@@ -19,13 +19,13 @@ function addItemInput(overrides: Partial<{ productId: ProductId; quantity: Quant
 
 describe('Cart', () => {
   it('starts empty with a zero total', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     expect(cart.isEmpty).toBe(true);
     expect(cart.total.cents).toBe(0);
   });
 
   it('adds a new line item and records a CartItemAdded event', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     const productId = ProductId.create();
 
     cart.addItem(addItemInput({ productId, quantity: Quantity.of(2) }));
@@ -39,7 +39,7 @@ describe('Cart', () => {
   });
 
   it('merges quantities when the same product is added twice', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     const productId = ProductId.create();
 
     cart.addItem(addItemInput({ productId, quantity: Quantity.of(2) }));
@@ -50,7 +50,7 @@ describe('Cart', () => {
   });
 
   it('sums subtotals across distinct products for the cart total', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     cart.addItem(addItemInput({ quantity: Quantity.of(1) })); // 1999
     cart.addItem(addItemInput({ quantity: Quantity.of(2) })); // 3998
 
@@ -58,7 +58,7 @@ describe('Cart', () => {
   });
 
   it('updates the quantity of an existing item and records an event', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     const productId = ProductId.create();
     cart.addItem(addItemInput({ productId, quantity: Quantity.of(1) }));
     cart.pullDomainEvents();
@@ -70,14 +70,14 @@ describe('Cart', () => {
   });
 
   it('throws NotFoundError when updating a product that is not in the cart', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     expect(() => cart.updateItemQuantity(ProductId.create(), Quantity.of(1))).toThrow(
       NotFoundError,
     );
   });
 
   it('removes an item and records a CartItemRemoved event', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     const productId = ProductId.create();
     cart.addItem(addItemInput({ productId }));
     cart.pullDomainEvents();
@@ -89,7 +89,7 @@ describe('Cart', () => {
   });
 
   it('throws NotFoundError when removing a product that is not in the cart', () => {
-    const cart = Cart.create();
+    const cart = Cart.create('buyer-1');
     expect(() => cart.removeItem(ProductId.create())).toThrow(NotFoundError);
   });
 });

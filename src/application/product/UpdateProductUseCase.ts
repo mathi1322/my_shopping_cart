@@ -2,6 +2,7 @@ import { ProductId } from '../../domain/product/ProductId';
 import { Money } from '../../domain/shared/Money';
 import { ForbiddenError, NotFoundError } from '../../domain/shared/DomainError';
 import type { ProductRepository } from '../../domain/product/ProductRepository';
+import type { AnyProductCategory } from '../../domain/product/ProductCategory';
 import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
 import type { RequestingUser } from '../shared/RequestingUser';
 import { toProductDto, type ProductDto } from './ProductDto';
@@ -11,6 +12,8 @@ export interface UpdateProductInput {
   description?: string;
   priceInCents?: number;
   stockQuantity?: number;
+  category?: AnyProductCategory;
+  images?: string[];
 }
 
 export class UpdateProductUseCase {
@@ -38,6 +41,8 @@ export class UpdateProductUseCase {
       description: input.description,
       price: input.priceInCents !== undefined ? Money.fromCents(input.priceInCents) : undefined,
       stockQuantity: input.stockQuantity,
+      category: input.category,
+      images: input.images,
     });
 
     await this.productRepository.save(product);

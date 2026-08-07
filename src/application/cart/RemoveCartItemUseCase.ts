@@ -1,12 +1,11 @@
 import { Cart } from '../../domain/cart/Cart';
-import { CartId } from '../../domain/cart/CartId';
 import { ProductId } from '../../domain/product/ProductId';
 import { NotFoundError } from '../../domain/shared/DomainError';
 import type { CartRepository } from '../../domain/cart/CartRepository';
 import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
 
 export interface RemoveCartItemInput {
-  cartId: string;
+  userId: string;
   productId: string;
 }
 
@@ -17,9 +16,9 @@ export class RemoveCartItemUseCase {
   ) {}
 
   async execute(input: RemoveCartItemInput): Promise<Cart> {
-    const cart = await this.cartRepository.findById(CartId.fromString(input.cartId));
+    const cart = await this.cartRepository.findByUserId(input.userId);
     if (!cart) {
-      throw new NotFoundError(`Cart ${input.cartId} not found`);
+      throw new NotFoundError(`No cart found for user ${input.userId}`);
     }
 
     cart.removeItem(ProductId.fromString(input.productId));

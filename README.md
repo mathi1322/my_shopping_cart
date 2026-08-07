@@ -24,7 +24,7 @@ There are two roles, chosen at registration:
 - **Buyer** — browse products and use the cart. Buyers don't strictly need an account (the cart works anonymously via cookie), but registering lets you have an identity in the header.
 - **Seller** — everything a buyer can do, plus a "My Products" dashboard (`/sell`) to add, edit, and delete their own product listings. A seller can only ever modify products they created.
 
-Register at `/register`, log in at `/login`. The Docker seed also creates 3 demo sellers and 1 demo buyer (password `password123` for all): `seller1@shopkart.test`, `seller2@shopkart.test`, `seller3@shopkart.test`, `buyer@shopkart.test`.
+Register at `/register`, log in at `/login`. The Docker seed also creates 3 demo sellers and 1 demo buyer (password `password123` for all): `seller1@medikart.test`, `seller2@medikart.test`, `seller3@medikart.test`, `buyer@medikart.test`.
 
 ## Quick start (Docker)
 

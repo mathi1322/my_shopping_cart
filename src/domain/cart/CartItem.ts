@@ -6,6 +6,7 @@ import { Quantity } from './Quantity';
 export interface CartItemProps {
   productId: ProductId;
   productName: string;
+  productImage: string | null;
   vendorId: VendorId;
   unitPrice: Money;
   quantity: Quantity;
@@ -24,6 +25,10 @@ export class CartItem {
 
   get productName(): string {
     return this.props.productName;
+  }
+
+  get productImage(): string | null {
+    return this.props.productImage;
   }
 
   get vendorId(): VendorId {

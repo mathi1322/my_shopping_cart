@@ -1,5 +1,4 @@
 import { Cart } from '../../domain/cart/Cart';
-import { CartId } from '../../domain/cart/CartId';
 import { Quantity } from '../../domain/cart/Quantity';
 import { ProductId } from '../../domain/product/ProductId';
 import { ConflictError, NotFoundError } from '../../domain/shared/DomainError';
@@ -8,7 +7,7 @@ import type { ProductRepository } from '../../domain/product/ProductRepository';
 import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
 
 export interface UpdateCartItemQuantityInput {
-  cartId: string;
+  userId: string;
   productId: string;
   quantity: number;
 }
@@ -21,9 +20,9 @@ export class UpdateCartItemQuantityUseCase {
   ) {}
 
   async execute(input: UpdateCartItemQuantityInput): Promise<Cart> {
-    const cart = await this.cartRepository.findById(CartId.fromString(input.cartId));
+    const cart = await this.cartRepository.findByUserId(input.userId);
     if (!cart) {
-      throw new NotFoundError(`Cart ${input.cartId} not found`);
+      throw new NotFoundError(`No cart found for user ${input.userId}`);
     }
 
     const productId = ProductId.fromString(input.productId);

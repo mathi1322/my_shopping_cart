@@ -3,6 +3,7 @@ import { ValidationError } from '../shared/DomainError';
 import { Money } from '../shared/Money';
 import { ProductId } from './ProductId';
 import { VendorId } from './VendorId';
+import { FALLBACK_PRODUCT_CATEGORY, type AnyProductCategory } from './ProductCategory';
 import { ProductCreated, ProductUpdated } from './ProductEvents';
 
 export interface ProductProps {
@@ -12,6 +13,9 @@ export interface ProductProps {
   description: string;
   price: Money;
   stockQuantity: number;
+  category: AnyProductCategory;
+  features: string[];
+  images: string[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,6 +26,9 @@ export interface CreateProductInput {
   description: string;
   price: Money;
   stockQuantity: number;
+  category?: AnyProductCategory;
+  features?: string[];
+  images?: string[];
 }
 
 export interface UpdateProductInput {
@@ -29,6 +36,8 @@ export interface UpdateProductInput {
   description?: string;
   price?: Money;
   stockQuantity?: number;
+  category?: AnyProductCategory;
+  images?: string[];
 }
 
 const MAX_NAME_LENGTH = 200;
@@ -52,6 +61,9 @@ export class Product extends AggregateRoot {
       description: input.description.trim(),
       price: input.price,
       stockQuantity: input.stockQuantity,
+      category: input.category ?? FALLBACK_PRODUCT_CATEGORY,
+      features: input.features ?? [],
+      images: input.images ?? [],
       createdAt: now,
       updatedAt: now,
     });
@@ -80,6 +92,12 @@ export class Product extends AggregateRoot {
       Product.assertStock(input.stockQuantity);
       this.props.stockQuantity = input.stockQuantity;
     }
+    if (input.category !== undefined) {
+      this.props.category = input.category;
+    }
+    if (input.images !== undefined) {
+      this.props.images = input.images;
+    }
     this.props.updatedAt = new Date();
     this.addDomainEvent(new ProductUpdated(this.id));
   }
@@ -106,6 +124,18 @@ export class Product extends AggregateRoot {
 
   get stockQuantity(): number {
     return this.props.stockQuantity;
+  }
+
+  get category(): AnyProductCategory {
+    return this.props.category;
+  }
+
+  get features(): string[] {
+    return this.props.features;
+  }
+
+  get images(): string[] {
+    return this.props.images;
   }
 
   get createdAt(): Date {

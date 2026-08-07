@@ -4,86 +4,273 @@ import AddToCartControl from '../components/AddToCartControl';
 import { container } from '../infrastructure/di/container';
 import { placeholderTile } from '../lib/ui/placeholderTile';
 
-const allProducts = await container.listProducts.execute();
+const PRICE_BANDS = [
+  { value: 'under-1000', label: 'Under ₹1,000', min: 0, max: 99999 },
+  { value: '1000-2000', label: '₹1,000 – ₹2,000', min: 100000, max: 199999 },
+  { value: 'above-2000', label: 'Above ₹2,000', min: 200000, max: Infinity },
+];
+
+const vendorIdFilter = Astro.url.searchParams.get('vendorId')?.trim() ?? '';
+const allProducts = await container.listProducts.execute(
+  vendorIdFilter ? { vendorId: vendorIdFilter } : {},
+);
 
 const query = Astro.url.searchParams.get('q')?.trim() ?? '';
-const products = query
-  ? allProducts.filter((product) => {
-      const haystack = `${product.name} ${product.description}`.toLowerCase();
-      return haystack.includes(query.toLowerCase());
-    })
-  : allProducts;
+const selectedCategories = Astro.url.searchParams.getAll('category');
+const priceBandValue = Astro.url.searchParams.get('priceBand') ?? '';
+const inStockOnly = Astro.url.searchParams.get('inStock') === '1';
+const selectedPriceBand = PRICE_BANDS.find((band) => band.value === priceBandValue);
+
+const availableCategories = [...new Set(allProducts.map((product) => product.category))].sort();
+
+let products = allProducts;
+if (query) {
+  products = products.filter((product) => {
+    const haystack = `${product.name} ${product.description}`.toLowerCase();
+    return haystack.includes(query.toLowerCase());
+  });
+}
+if (selectedCategories.length > 0) {
+  products = products.filter((product) => selectedCategories.includes(product.category));
+}
+if (selectedPriceBand) {
+  products = products.filter(
+    (product) =>
+      product.priceInCents >= selectedPriceBand.min && product.priceInCents <= selectedPriceBand.max,
+  );
+}
+if (inStockOnly) {
+  products = products.filter((product) => product.stockQuantity > 0);
+}
+
+const hasActiveFilters = selectedCategories.length > 0 || !!selectedPriceBand || inStockOnly;
+const isOwnStorefront = !!vendorIdFilter && vendorIdFilter === Astro.locals.user?.id;
+
+function buildUrl(
+  overrides: {
+    q?: string;
+    categories?: string[];
+    priceBand?: string;
+    inStock?: boolean;
+    vendorId?: string;
+  } = {},
+): string {
+  const params = new URLSearchParams();
+  const q = overrides.q ?? query;
+  const categories = overrides.categories ?? selectedCategories;
+  const band = overrides.priceBand ?? priceBandValue;
+  const stock = overrides.inStock ?? inStockOnly;
+  const vendorId = overrides.vendorId ?? vendorIdFilter;
+
+  if (q) params.set('q', q);
+  categories.forEach((category) => params.append('category', category));
+  if (band) params.set('priceBand', band);
+  if (stock) params.set('inStock', '1');
+  if (vendorId) params.set('vendorId', vendorId);
+
+  const qs = params.toString();
+  return qs ? `/?${qs}` : '/';
+}
 
 function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(cents / 100);
 }
 ---
 
 <Layout title="Products" searchQuery={query}>
   {
+    vendorIdFilter && (
+      <p class="mb-4 text-sm text-slate-500">
+        Showing products from {isOwnStorefront ? 'your store' : 'this seller'} ·{' '}
+        <a href={buildUrl({ vendorId: '' })} class="text-brand hover:underline">
+          View all products
+        </a>
+      </p>
+    )
+  }
+  {
     query && (
       <p class="mb-4 text-sm text-slate-500">
         {products.length} result{products.length === 1 ? '' : 's'} for <b>“{query}”</b> ·{' '}
-        <a href="/" class="text-[#2874f0] hover:underline">
+        <a href={buildUrl({ q: '' })} class="text-brand hover:underline">
           Clear search
         </a>
       </p>
     )
   }
 
-  {
-    products.length === 0 ? (
-      <div class="rounded bg-white p-10 text-center shadow-sm">
-        <p class="text-lg font-medium text-slate-700">No products found</p>
-        <p class="mt-1 text-sm text-slate-500">
-          {query ? 'Try a different search term.' : 'Run the seed script to add demo products.'}
-        </p>
+  <div class="grid grid-cols-1 gap-6 sm:grid-cols-[220px_1fr]">
+    <aside class="rounded-2xl border border-blue-200 bg-white p-4 sm:h-fit">
+      <div class="flex items-center justify-between">
+        <h2 class="font-heading text-sm font-bold text-gray-600">Filters</h2>
+        {
+          hasActiveFilters && (
+            <a href={buildUrl({ categories: [], priceBand: '', inStock: false })} class="text-xs text-brand hover:underline">
+              Clear filters
+            </a>
+          )
+        }
       </div>
-    ) : (
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
-        {products.map((product) => {
-          const tile = placeholderTile(product.name);
-          return (
-            <article class="flex flex-col overflow-hidden rounded bg-white shadow-sm transition hover:shadow-lg">
-              <div
-                class="flex aspect-square items-center justify-center text-4xl font-bold text-slate-500/70"
-                style={{ background: tile.background }}
-              >
-                {tile.glyph}
-              </div>
-              <div class="flex flex-1 flex-col p-3 sm:p-4">
-                <h2 class="line-clamp-2 text-sm font-medium text-slate-800 sm:text-base">
-                  {product.name}
-                </h2>
-                <p class="mt-1 line-clamp-2 text-xs text-slate-500">{product.description}</p>
 
-                <div class="mt-2 flex items-baseline gap-2">
-                  <span class="text-lg font-bold text-slate-900">
-                    {formatMoney(product.priceInCents, product.currency)}
-                  </span>
-                </div>
-
-                <p
-                  class={`mt-1 text-xs font-medium ${
-                    product.stockQuantity > 0 ? 'text-green-600' : 'text-red-500'
-                  }`}
-                >
-                  {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'}
-                  <span class="font-normal text-slate-400"> · sold by {product.vendorId}</span>
-                </p>
-
-                <div class="mt-auto pt-3">
-                  <AddToCartControl
-                    client:load
-                    productId={product.id}
-                    stockQuantity={product.stockQuantity}
+      {
+        availableCategories.length > 0 && (
+          <div class="mt-4">
+            <p class="mb-2 text-xs font-semibold text-gray-500 uppercase">Category</p>
+            <div class="flex flex-col gap-2">
+              {availableCategories.map((category) => (
+                <label class="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    name="category"
+                    value={category}
+                    form="filters-form"
+                    checked={selectedCategories.includes(category)}
+                    class="h-4 w-4 accent-[#1341a3]"
                   />
-                </div>
-              </div>
-            </article>
-          );
-        })}
+                  {category}
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      }
+
+      <div class="mt-4">
+        <p class="mb-2 text-xs font-semibold text-gray-500 uppercase">Price</p>
+        <div class="flex flex-col gap-2">
+          {PRICE_BANDS.map((band) => (
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="radio"
+                name="priceBand"
+                value={band.value}
+                form="filters-form"
+                checked={priceBandValue === band.value}
+                class="h-4 w-4 accent-[#1341a3]"
+              />
+              {band.label}
+            </label>
+          ))}
+          {priceBandValue && (
+            <label class="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="radio"
+                name="priceBand"
+                value=""
+                form="filters-form"
+                class="h-4 w-4 accent-[#1341a3]"
+              />
+              Any price
+            </label>
+          )}
+        </div>
       </div>
-    )
-  }
+
+      <div class="mt-4">
+        <label class="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            name="inStock"
+            value="1"
+            form="filters-form"
+            checked={inStockOnly}
+            class="h-4 w-4 accent-[#1341a3]"
+          />
+          In stock only
+        </label>
+      </div>
+
+      {vendorIdFilter && <input type="hidden" name="vendorId" value={vendorIdFilter} form="filters-form" />}
+
+      <button
+        type="submit"
+        form="filters-form"
+        class="mt-5 w-full rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+      >
+        Apply Filters
+      </button>
+    </aside>
+
+    <div>
+      {
+        products.length === 0 ? (
+          <div class="rounded bg-white p-10 text-center shadow-sm">
+            <p class="text-lg font-medium text-slate-700">No products found</p>
+            <p class="mt-1 text-sm text-slate-500">
+              {query || hasActiveFilters
+                ? 'Try a different search term or fewer filters.'
+                : 'Run the seed script to add demo products.'}
+            </p>
+          </div>
+        ) : (
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+            {products.map((product) => {
+              const tile = placeholderTile(product.name);
+              return (
+                <article class="flex flex-col overflow-hidden rounded-2xl border border-blue-200 bg-white transition hover:shadow-[0_0_10px_rgba(0,0,255,0.24)]">
+                  <a href={`/products/${product.id}`} class="contents">
+                    {product.images[0] ? (
+                      <img
+                        src={product.images[0]}
+                        alt={product.name}
+                        class="aspect-square w-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        class="flex aspect-square items-center justify-center text-4xl font-bold text-slate-500/70"
+                        style={{ background: tile.background }}
+                      >
+                        {tile.glyph}
+                      </div>
+                    )}
+                    <div class="flex flex-1 flex-col p-4 sm:p-6">
+                      <h2 class="line-clamp-2 font-heading text-sm font-bold text-gray-600 sm:text-base">
+                        {product.name}
+                      </h2>
+                      <p class="mt-1 line-clamp-2 text-xs font-medium text-gray-500">
+                        {product.description}
+                      </p>
+
+                      <div class="mt-2 flex items-baseline gap-2">
+                        <span class="text-lg font-bold text-slate-900">
+                          {formatMoney(product.priceInCents, product.currency)}
+                        </span>
+                      </div>
+
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        <span
+                          class={`rounded border px-2 py-1 text-xs font-medium ${
+                            product.stockQuantity > 0
+                              ? 'border-green-200 text-green-700'
+                              : 'border-red-200 text-red-600'
+                          }`}
+                        >
+                          {product.stockQuantity > 0
+                            ? `${product.stockQuantity} in stock`
+                            : 'Out of stock'}
+                        </span>
+                        <span class="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-brand">
+                          {product.category}
+                        </span>
+                      </div>
+                      <p class="mt-1 text-xs text-slate-400">sold by {product.vendorId}</p>
+                    </div>
+                  </a>
+
+                  <div class="px-4 pb-4 sm:px-6 sm:pb-6">
+                    <AddToCartControl
+                      client:load
+                      productId={product.id}
+                      stockQuantity={product.stockQuantity}
+                      initialLoggedIn={!!Astro.locals.user}
+                    />
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )
+      }
+    </div>
+  </div>
 </Layout>

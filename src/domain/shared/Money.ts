@@ -10,7 +10,7 @@ export class Money {
     private readonly currency: string,
   ) {}
 
-  static fromCents(amountInCents: number, currency = 'USD'): Money {
+  static fromCents(amountInCents: number, currency = 'INR'): Money {
     if (!Number.isInteger(amountInCents)) {
       throw new ValidationError('Money amount must be an integer number of cents');
     }
@@ -20,7 +20,7 @@ export class Money {
     return new Money(amountInCents, currency);
   }
 
-  static zero(currency = 'USD'): Money {
+  static zero(currency = 'INR'): Money {
     return new Money(0, currency);
   }
 

@@ -1,11 +1,25 @@
 import { useEffect, useState } from 'preact/hooks';
+import type { AuthUser } from './LoginForm';
 
-export default function CartBadge() {
+interface Props {
+  initialLoggedIn: boolean;
+}
+
+export default function CartBadge({ initialLoggedIn }: Props) {
   const [count, setCount] = useState<number | null>(null);
+  const [loggedIn, setLoggedIn] = useState(initialLoggedIn);
 
-  async function refresh() {
+  async function refresh(isLoggedIn: boolean) {
+    if (!isLoggedIn) {
+      setCount(null);
+      return;
+    }
     try {
       const res = await fetch('/api/cart');
+      if (!res.ok) {
+        setCount(null);
+        return;
+      }
       const data = await res.json();
       const itemCount = data.items.reduce(
         (sum: number, item: { quantity: number }) => sum + item.quantity,
@@ -18,15 +32,41 @@ export default function CartBadge() {
   }
 
   useEffect(() => {
-    refresh();
-    const handler = () => refresh();
-    window.addEventListener('cart:updated', handler);
-    return () => window.removeEventListener('cart:updated', handler);
-  }, []);
+    refresh(loggedIn);
+    const cartHandler = () => refresh(loggedIn);
+    window.addEventListener('cart:updated', cartHandler);
+    function authHandler(event: Event) {
+      const detail = (event as CustomEvent<{ user: AuthUser | null }>).detail;
+      const isLoggedIn = !!detail?.user;
+      setLoggedIn(isLoggedIn);
+      refresh(isLoggedIn);
+    }
+    window.addEventListener('auth:changed', authHandler);
+    return () => {
+      window.removeEventListener('cart:updated', cartHandler);
+      window.removeEventListener('auth:changed', authHandler);
+    };
+  }, [loggedIn]);
+
+  function handleClick(event: MouseEvent) {
+    if (!loggedIn) {
+      event.preventDefault();
+      window.dispatchEvent(
+        new CustomEvent('auth:login-required', {
+          detail: {
+            onSuccess: () => {
+              window.location.href = '/cart';
+            },
+          },
+        }),
+      );
+    }
+  }
 
   return (
     <a
       href="/cart"
+      onClick={handleClick}
       class="inline-flex items-center gap-2 rounded-sm px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10"
     >
       <svg
@@ -39,7 +79,7 @@ export default function CartBadge() {
       </svg>
       <span class="hidden sm:inline">Cart</span>
       {count !== null && count > 0 && (
-        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ffe11b] px-1.5 text-xs font-bold text-slate-900">
+        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-slate-900">
           {count}
         </span>
       )}

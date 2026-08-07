@@ -1,7 +1,7 @@
 import { AggregateRoot } from '../shared/AggregateRoot';
 import { Email } from './Email';
 import { UserId } from './UserId';
-import { UserRegistered } from './UserEvents';
+import { UserRegistered, UserProfileUpdated } from './UserEvents';
 import type { PasswordHasher } from './PasswordHasher';
 
 export type UserRole = 'buyer' | 'seller';
@@ -11,6 +11,12 @@ export interface UserProps {
   email: Email;
   passwordHash: string;
   role: UserRole;
+  name: string | null;
+  phone: string | null;
+  address: string | null;
+  companyName: string | null;
+  companyAddress: string | null;
+  gstNumber: string | null;
   createdAt: Date;
 }
 
@@ -18,6 +24,15 @@ export interface RegisterUserInput {
   email: Email;
   passwordHash: string;
   role: UserRole;
+}
+
+export interface UpdateProfileInput {
+  name?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  companyName?: string | null;
+  companyAddress?: string | null;
+  gstNumber?: string | null;
 }
 
 export class User extends AggregateRoot {
@@ -31,10 +46,26 @@ export class User extends AggregateRoot {
       email: input.email,
       passwordHash: input.passwordHash,
       role: input.role,
+      name: null,
+      phone: null,
+      address: null,
+      companyName: null,
+      companyAddress: null,
+      gstNumber: null,
       createdAt: new Date(),
     });
     user.addDomainEvent(new UserRegistered(user.id, user.email, user.role));
     return user;
+  }
+
+  updateProfile(input: UpdateProfileInput): void {
+    if (input.name !== undefined) this.props.name = input.name;
+    if (input.phone !== undefined) this.props.phone = input.phone;
+    if (input.address !== undefined) this.props.address = input.address;
+    if (input.companyName !== undefined) this.props.companyName = input.companyName;
+    if (input.companyAddress !== undefined) this.props.companyAddress = input.companyAddress;
+    if (input.gstNumber !== undefined) this.props.gstNumber = input.gstNumber;
+    this.addDomainEvent(new UserProfileUpdated(this.id));
   }
 
   /** Rebuilds a User from persisted state — bypasses registration events. */
@@ -56,6 +87,30 @@ export class User extends AggregateRoot {
 
   get role(): UserRole {
     return this.props.role;
+  }
+
+  get name(): string | null {
+    return this.props.name;
+  }
+
+  get phone(): string | null {
+    return this.props.phone;
+  }
+
+  get address(): string | null {
+    return this.props.address;
+  }
+
+  get companyName(): string | null {
+    return this.props.companyName;
+  }
+
+  get companyAddress(): string | null {
+    return this.props.companyAddress;
+  }
+
+  get gstNumber(): string | null {
+    return this.props.gstNumber;
   }
 
   /** Exposed only for persistence (see DrizzleUserRepository) — never put this in a DTO. */

@@ -1,14 +1,26 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+import type { AuthUser } from './LoginForm';
 
 interface Props {
   productId: string;
   stockQuantity: number;
+  initialLoggedIn: boolean;
 }
 
-export default function AddToCartControl({ productId, stockQuantity }: Props) {
+export default function AddToCartControl({ productId, stockQuantity, initialLoggedIn }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [loggedIn, setLoggedIn] = useState(initialLoggedIn);
+
+  useEffect(() => {
+    function handler(event: Event) {
+      const detail = (event as CustomEvent<{ user: AuthUser | null }>).detail;
+      setLoggedIn(!!detail?.user);
+    }
+    window.addEventListener('auth:changed', handler);
+    return () => window.removeEventListener('auth:changed', handler);
+  }, []);
 
   const outOfStock = stockQuantity <= 0;
 
@@ -16,8 +28,7 @@ export default function AddToCartControl({ productId, stockQuantity }: Props) {
     return Math.max(1, Math.min(stockQuantity, value));
   }
 
-  async function addToCart(event: Event) {
-    event.preventDefault();
+  async function performAddToCart() {
     setStatus('loading');
     setMessage('');
     try {
@@ -41,6 +52,17 @@ export default function AddToCartControl({ productId, stockQuantity }: Props) {
     }
   }
 
+  function handleSubmit(event: Event) {
+    event.preventDefault();
+    if (!loggedIn) {
+      window.dispatchEvent(
+        new CustomEvent('auth:login-required', { detail: { onSuccess: () => performAddToCart() } }),
+      );
+      return;
+    }
+    performAddToCart();
+  }
+
   if (outOfStock) {
     return (
       <button
@@ -54,7 +76,7 @@ export default function AddToCartControl({ productId, stockQuantity }: Props) {
   }
 
   return (
-    <form class="flex flex-col gap-2" onSubmit={addToCart}>
+    <form class="flex flex-col gap-2" onSubmit={handleSubmit}>
       <div class="flex items-center gap-2">
         <div class="flex items-center rounded-sm border border-slate-300">
           <button
@@ -88,7 +110,7 @@ export default function AddToCartControl({ productId, stockQuantity }: Props) {
       <button
         type="submit"
         disabled={status === 'loading'}
-        class="w-full rounded-sm bg-[#fb641b] px-3 py-2 text-xs font-bold tracking-wide text-white uppercase shadow-sm hover:bg-[#e0570f] disabled:opacity-60 sm:text-sm"
+        class="w-full rounded-full bg-brand px-3 py-2 text-xs font-bold tracking-wide text-white uppercase shadow-sm hover:bg-brand-dark disabled:opacity-60 sm:text-sm"
       >
         {status === 'loading' ? 'Adding…' : 'Add to cart'}
       </button>

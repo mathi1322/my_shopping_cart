@@ -1,6 +1,8 @@
 ---
 import '../styles/global.css';
 import CartBadge from '../components/CartBadge';
+import AuthStatus from '../components/AuthStatus';
+import LoginModal from '../components/LoginModal';
 
 interface Props {
   title: string;
@@ -16,17 +18,22 @@ const user = Astro.locals.user;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{title} · ShopKart</title>
+    <title>{title} · MediKart</title>
   </head>
-  <body class="min-h-full bg-[#f1f3f6] text-slate-900">
-    <header class="sticky top-0 z-10 bg-[#2874f0] shadow-md">
+  <body class="min-h-full bg-page text-slate-900">
+    <header class="sticky top-0 z-10 bg-brand shadow-md">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-2.5 sm:gap-6 sm:py-2">
-        <a href="/" class="shrink-0 text-xl leading-tight font-bold text-white italic">
-          Shop<span class="text-[#ffe11b]">Kart</span>
+        <a href="/" class="shrink-0 font-heading text-xl leading-tight font-bold text-white">
+          Medi<span class="text-accent">Kart</span>
         </a>
 
-        <form action="/" method="get" class="order-3 w-full sm:order-2 sm:max-w-xl sm:flex-1">
-          <div class="flex items-center rounded-sm bg-white px-3 py-2 shadow-sm">
+        <form
+          id="filters-form"
+          action="/"
+          method="get"
+          class="order-3 w-full sm:order-2 sm:max-w-xl sm:flex-1"
+        >
+          <div class="flex items-center rounded-full border-2 border-white/0 bg-white px-3 py-2 shadow-sm focus-within:border-accent">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"
@@ -49,37 +56,11 @@ const user = Astro.locals.user;
         </form>
 
         <nav class="order-2 ml-auto flex items-center gap-1 sm:order-3 sm:gap-2">
-          {
-            user?.role === 'seller' && (
-              <a
-                href="/sell"
-                class="hidden rounded-sm px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10 sm:inline-block"
-              >
-                Sell
-              </a>
-            )
-          }
-          <CartBadge client:load />
-          {
-            user ? (
-              <div class="flex items-center gap-1 text-sm text-white sm:gap-2">
-                <span class="hidden sm:inline">Hi, {user.email}</span>
-                <button
-                  id="logout-button"
-                  class="rounded-sm px-2 py-1.5 font-semibold hover:bg-white/10"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
-              <a
-                href="/login"
-                class="rounded-sm px-3 py-1.5 text-sm font-semibold text-white hover:bg-white/10"
-              >
-                Login
-              </a>
-            )
-          }
+          <CartBadge client:load initialLoggedIn={!!user} />
+          <AuthStatus
+            client:load
+            initialUser={user ? { id: user.id, email: user.email, role: user.role } : null}
+          />
         </nav>
       </div>
     </header>
@@ -87,11 +68,6 @@ const user = Astro.locals.user;
       <slot />
     </main>
 
-    <script>
-      document.getElementById('logout-button')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
-        window.location.assign('/');
-      });
-    </script>
+    <LoginModal client:load />
   </body>
 </html>

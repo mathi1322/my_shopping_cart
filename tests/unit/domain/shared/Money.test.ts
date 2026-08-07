@@ -6,7 +6,7 @@ describe('Money', () => {
   it('creates money from a non-negative integer number of cents', () => {
     const money = Money.fromCents(1999);
     expect(money.cents).toBe(1999);
-    expect(money.currencyCode).toBe('USD');
+    expect(money.currencyCode).toBe('INR');
   });
 
   it('rejects negative amounts', () => {

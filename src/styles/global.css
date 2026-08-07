@@ -1,1 +1,17 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap');
 @import 'tailwindcss';
+
+/* iCliniq-inspired brand theme */
+@theme {
+  --color-brand: #1341a3;
+  --color-brand-dark: #0f3480;
+  --color-accent: #faca15;
+  --color-accent-dark: #e6b800;
+  --color-page: #f5f9ff;
+  --font-heading: 'Montserrat', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}

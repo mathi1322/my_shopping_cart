@@ -3,6 +3,7 @@ import { VendorId } from '../../domain/product/VendorId';
 import { Money } from '../../domain/shared/Money';
 import { ForbiddenError } from '../../domain/shared/DomainError';
 import type { ProductRepository } from '../../domain/product/ProductRepository';
+import type { AnyProductCategory } from '../../domain/product/ProductCategory';
 import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
 import type { RequestingUser } from '../shared/RequestingUser';
 import { toProductDto, type ProductDto } from './ProductDto';
@@ -12,6 +13,9 @@ export interface CreateProductInput {
   description: string;
   priceInCents: number;
   stockQuantity: number;
+  category?: AnyProductCategory;
+  features?: string[];
+  images?: string[];
 }
 
 export class CreateProductUseCase {
@@ -31,6 +35,9 @@ export class CreateProductUseCase {
       description: input.description,
       price: Money.fromCents(input.priceInCents),
       stockQuantity: input.stockQuantity,
+      category: input.category,
+      features: input.features,
+      images: input.images,
     });
 
     await this.productRepository.save(product);

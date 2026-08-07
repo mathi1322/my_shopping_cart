@@ -2,6 +2,7 @@ import { db } from '../db/client';
 import { DrizzleProductRepository } from '../repositories/DrizzleProductRepository';
 import { DrizzleCartRepository } from '../repositories/DrizzleCartRepository';
 import { DrizzleUserRepository } from '../repositories/DrizzleUserRepository';
+import { DrizzleReviewRepository } from '../repositories/DrizzleReviewRepository';
 import { DrizzleSessionStore } from '../auth/DrizzleSessionStore';
 import { ScryptPasswordHasher } from '../auth/ScryptPasswordHasher';
 import { ConsoleDomainEventPublisher } from '../../application/shared/DomainEventPublisher';
@@ -10,6 +11,7 @@ import { UpdateProductUseCase } from '../../application/product/UpdateProductUse
 import { DeleteProductUseCase } from '../../application/product/DeleteProductUseCase';
 import { GetProductUseCase } from '../../application/product/GetProductUseCase';
 import { ListProductsUseCase } from '../../application/product/ListProductsUseCase';
+import { ListReviewsForProductUseCase } from '../../application/review/ListReviewsForProductUseCase';
 import { GetOrCreateCartUseCase } from '../../application/cart/GetOrCreateCartUseCase';
 import { AddItemToCartUseCase } from '../../application/cart/AddItemToCartUseCase';
 import { UpdateCartItemQuantityUseCase } from '../../application/cart/UpdateCartItemQuantityUseCase';
@@ -17,10 +19,12 @@ import { RemoveCartItemUseCase } from '../../application/cart/RemoveCartItemUseC
 import { RegisterUserUseCase } from '../../application/identity/RegisterUserUseCase';
 import { AuthenticateUserUseCase } from '../../application/identity/AuthenticateUserUseCase';
 import { ResolveSessionUseCase } from '../../application/identity/ResolveSessionUseCase';
+import { UpdateUserProfileUseCase } from '../../application/identity/UpdateUserProfileUseCase';
 
 const productRepository = new DrizzleProductRepository(db);
 const cartRepository = new DrizzleCartRepository(db);
 const userRepository = new DrizzleUserRepository(db);
+const reviewRepository = new DrizzleReviewRepository(db);
 const sessionStore = new DrizzleSessionStore(db);
 const passwordHasher = new ScryptPasswordHasher();
 const eventPublisher = new ConsoleDomainEventPublisher();
@@ -37,6 +41,7 @@ export const container = {
   deleteProduct: new DeleteProductUseCase(productRepository, eventPublisher),
   getProduct: new GetProductUseCase(productRepository),
   listProducts: new ListProductsUseCase(productRepository),
+  listReviewsForProduct: new ListReviewsForProductUseCase(reviewRepository),
   getOrCreateCart,
   addItemToCart: new AddItemToCartUseCase(
     cartRepository,
@@ -54,4 +59,5 @@ export const container = {
   registerUser: new RegisterUserUseCase(userRepository, passwordHasher, eventPublisher),
   authenticateUser: new AuthenticateUserUseCase(userRepository, passwordHasher),
   resolveSession: new ResolveSessionUseCase(sessionStore, userRepository),
+  updateUserProfile: new UpdateUserProfileUseCase(userRepository, eventPublisher),
 };

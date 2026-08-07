@@ -8,7 +8,7 @@ import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
 import type { GetOrCreateCartUseCase } from './GetOrCreateCartUseCase';
 
 export interface AddItemToCartInput {
-  cartId?: string;
+  userId: string;
   productId: string;
   quantity: number;
 }
@@ -22,7 +22,7 @@ export class AddItemToCartUseCase {
   ) {}
 
   async execute(input: AddItemToCartInput): Promise<Cart> {
-    const cart = await this.getOrCreateCart.execute(input.cartId);
+    const cart = await this.getOrCreateCart.execute(input.userId);
     const product = await this.productRepository.findById(ProductId.fromString(input.productId));
     if (!product) {
       throw new NotFoundError(`Product ${input.productId} not found`);
@@ -41,6 +41,7 @@ export class AddItemToCartUseCase {
     cart.addItem({
       productId: product.id,
       productName: product.name,
+      productImage: product.images[0] ?? null,
       vendorId: product.vendorId,
       unitPrice: product.price,
       quantity: requestedQuantity,

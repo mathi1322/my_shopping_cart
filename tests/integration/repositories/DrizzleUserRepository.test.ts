@@ -51,4 +51,28 @@ describe('DrizzleUserRepository', () => {
   it('returns null for an unknown email', async () => {
     expect(await repository.findByEmail(Email.fromString('nobody@example.com'))).toBeNull();
   });
+
+  it('persists profile updates on an existing user (upsert, not insert-only)', async () => {
+    const user = makeUser();
+    await repository.save(user);
+
+    user.updateProfile({
+      name: 'Priya Seller',
+      phone: '9876543210',
+      address: '221B Baker Street',
+      companyName: 'Priya Medical Supplies',
+      companyAddress: 'Unit 4, Industrial Estate',
+      gstNumber: '22AAAAA0000A1Z5',
+    });
+    await repository.save(user);
+
+    const found = await repository.findById(user.id);
+    expect(found?.name).toBe('Priya Seller');
+    expect(found?.phone).toBe('9876543210');
+    expect(found?.address).toBe('221B Baker Street');
+    expect(found?.companyName).toBe('Priya Medical Supplies');
+    expect(found?.companyAddress).toBe('Unit 4, Industrial Estate');
+    expect(found?.gstNumber).toBe('22AAAAA0000A1Z5');
+    expect(found?.email.toString()).toBe('seller@example.com');
+  });
 });

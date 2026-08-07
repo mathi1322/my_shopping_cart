@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
+import { PRODUCT_CATEGORIES } from '../domain/product/ProductCategory';
 
 interface ProductDto {
   id: string;
@@ -8,6 +9,8 @@ interface ProductDto {
   priceInCents: number;
   currency: string;
   stockQuantity: number;
+  category: string;
+  images: string[];
 }
 
 interface Props {
@@ -15,7 +18,7 @@ interface Props {
 }
 
 function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(cents / 100);
 }
 
 function toDollarsString(cents: number): string {
@@ -26,7 +29,82 @@ function toCents(dollars: string): number {
   return Math.round(Number(dollars) * 100);
 }
 
-const emptyForm = { name: '', description: '', price: '', stock: '' };
+const emptyForm = {
+  name: '',
+  description: '',
+  price: '',
+  stock: '',
+  category: PRODUCT_CATEGORIES[0] as string,
+  images: [] as string[],
+};
+
+interface ImageUrlsFieldProps {
+  images: string[];
+  onChange: (images: string[]) => void;
+}
+
+function ImageUrlsField({ images, onChange }: ImageUrlsFieldProps) {
+  const [urlInput, setUrlInput] = useState('');
+
+  function addUrl() {
+    const url = urlInput.trim();
+    if (!url) return;
+    onChange([...images, url]);
+    setUrlInput('');
+  }
+
+  function removeUrl(index: number) {
+    onChange(images.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div class="sm:col-span-2">
+      <div class="flex gap-2">
+        <input
+          type="url"
+          placeholder="Image URL (https://…)"
+          value={urlInput}
+          onInput={(e) => setUrlInput((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addUrl();
+            }
+          }}
+          class="flex-1 rounded border border-slate-300 px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={addUrl}
+          class="rounded-full bg-brand px-3 py-2 text-xs font-bold text-white uppercase hover:bg-brand-dark"
+        >
+          Add
+        </button>
+      </div>
+      {images.length > 0 && (
+        <div class="mt-2 flex flex-wrap gap-2">
+          {images.map((url, index) => (
+            <div key={url} class="relative h-16 w-16 shrink-0">
+              <img
+                src={url}
+                alt=""
+                class="h-16 w-16 rounded border border-slate-200 object-cover"
+              />
+              <button
+                type="button"
+                aria-label="Remove image"
+                onClick={() => removeUrl(index)}
+                class="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-slate-700 text-xs text-white hover:bg-slate-900"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function SellerProductManager({ vendorId }: Props) {
   const [products, setProducts] = useState<ProductDto[] | null>(null);
@@ -62,6 +140,8 @@ export default function SellerProductManager({ vendorId }: Props) {
           description: newProduct.description,
           priceInCents: toCents(newProduct.price),
           stockQuantity: Number(newProduct.stock),
+          category: newProduct.category,
+          images: newProduct.images,
         }),
       });
       const data = await res.json();
@@ -83,6 +163,8 @@ export default function SellerProductManager({ vendorId }: Props) {
       description: product.description,
       price: toDollarsString(product.priceInCents),
       stock: String(product.stockQuantity),
+      category: product.category,
+      images: product.images,
     });
   }
 
@@ -98,6 +180,8 @@ export default function SellerProductManager({ vendorId }: Props) {
           description: editDraft.description,
           priceInCents: toCents(editDraft.price),
           stockQuantity: Number(editDraft.stock),
+          category: editDraft.category,
+          images: editDraft.images,
         }),
       });
       const data = await res.json();
@@ -162,7 +246,7 @@ export default function SellerProductManager({ vendorId }: Props) {
             type="number"
             step="0.01"
             min="0"
-            placeholder="Price (USD)"
+            placeholder="Price (INR)"
             value={newProduct.price}
             onInput={(e) =>
               setNewProduct({ ...newProduct, price: (e.target as HTMLInputElement).value })
@@ -181,11 +265,28 @@ export default function SellerProductManager({ vendorId }: Props) {
             }
             class="rounded border border-slate-300 px-3 py-2 text-sm"
           />
+          <select
+            value={newProduct.category}
+            onInput={(e) =>
+              setNewProduct({ ...newProduct, category: (e.target as HTMLSelectElement).value })
+            }
+            class="rounded border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+          >
+            {PRODUCT_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+          <ImageUrlsField
+            images={newProduct.images}
+            onChange={(images) => setNewProduct({ ...newProduct, images })}
+          />
         </div>
         <button
           type="submit"
           disabled={creating}
-          class="mt-3 rounded-sm bg-[#fb641b] px-4 py-2 text-xs font-bold tracking-wide text-white uppercase hover:bg-[#e0570f] disabled:opacity-60"
+          class="mt-3 rounded-full bg-brand px-4 py-2 text-xs font-bold tracking-wide text-white uppercase hover:bg-brand-dark disabled:opacity-60"
         >
           {creating ? 'Adding…' : 'Add product'}
         </button>
@@ -244,12 +345,32 @@ export default function SellerProductManager({ vendorId }: Props) {
                       }
                       class="rounded border border-slate-300 px-3 py-2 text-sm"
                     />
+                    <select
+                      value={editDraft.category}
+                      onInput={(e) =>
+                        setEditDraft({
+                          ...editDraft,
+                          category: (e.target as HTMLSelectElement).value,
+                        })
+                      }
+                      class="rounded border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
+                    >
+                      {PRODUCT_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                    <ImageUrlsField
+                      images={editDraft.images}
+                      onChange={(images) => setEditDraft({ ...editDraft, images })}
+                    />
                   </div>
                   <div class="mt-3 flex gap-3">
                     <button
                       onClick={() => saveEdit(product.id)}
                       disabled={savingId === product.id}
-                      class="rounded-sm bg-[#2874f0] px-3 py-1.5 text-xs font-bold text-white uppercase hover:bg-[#1f5bc4] disabled:opacity-60"
+                      class="rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white uppercase hover:bg-brand-dark disabled:opacity-60"
                     >
                       Save
                     </button>
@@ -263,21 +384,31 @@ export default function SellerProductManager({ vendorId }: Props) {
                 </li>
               ) : (
                 <li key={product.id} class="flex flex-wrap items-center justify-between gap-3 p-4">
-                  <div>
-                    <p class="font-medium text-slate-800">{product.name}</p>
-                    <p class="text-sm text-slate-500">
-                      {formatMoney(product.priceInCents, product.currency)} ·{' '}
-                      <span class={product.stockQuantity > 0 ? 'text-green-600' : 'text-red-500'}>
-                        {product.stockQuantity > 0
-                          ? `${product.stockQuantity} in stock`
-                          : 'Out of stock'}
-                      </span>
-                    </p>
+                  <div class="flex items-center gap-3">
+                    {product.images[0] && (
+                      <img
+                        src={product.images[0]}
+                        alt=""
+                        class="h-12 w-12 shrink-0 rounded border border-slate-200 object-cover"
+                      />
+                    )}
+                    <div>
+                      <p class="font-medium text-slate-800">{product.name}</p>
+                      <p class="text-sm text-slate-500">
+                        {formatMoney(product.priceInCents, product.currency)} ·{' '}
+                        <span class={product.stockQuantity > 0 ? 'text-green-600' : 'text-red-500'}>
+                          {product.stockQuantity > 0
+                            ? `${product.stockQuantity} in stock`
+                            : 'Out of stock'}
+                        </span>
+                      </p>
+                      <p class="text-xs text-slate-400">{product.category}</p>
+                    </div>
                   </div>
                   <div class="flex gap-4">
                     <button
                       onClick={() => startEdit(product)}
-                      class="text-sm font-semibold text-[#2874f0] uppercase hover:underline"
+                      class="text-sm font-semibold text-brand uppercase hover:underline"
                     >
                       Edit
                     </button>

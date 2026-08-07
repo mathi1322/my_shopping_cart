@@ -3,6 +3,7 @@ import type { Cart } from '../../domain/cart/Cart';
 export interface CartItemDto {
   productId: string;
   productName: string;
+  productImage: string | null;
   vendorId: string;
   unitPriceInCents: number;
   quantity: number;
@@ -23,6 +24,7 @@ export function toCartDto(cart: Cart): CartDto {
     items: cart.items.map((item) => ({
       productId: item.productId.toString(),
       productName: item.productName,
+      productImage: item.productImage,
       vendorId: item.vendorId.toString(),
       unitPriceInCents: item.unitPrice.cents,
       quantity: item.quantity.value,

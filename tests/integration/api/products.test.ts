@@ -17,6 +17,7 @@ function validPayload(overrides: Record<string, unknown> = {}) {
     description: 'A reliable wireless mouse',
     priceInCents: 1999,
     stockQuantity: 10,
+    category: 'Diagnostic Devices',
     ...overrides,
   };
 }

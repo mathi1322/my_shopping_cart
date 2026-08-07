@@ -11,6 +11,7 @@ import { CartItemAdded, CartItemQuantityChanged, CartItemRemoved } from './CartE
 export interface AddItemInput {
   productId: ProductId;
   productName: string;
+  productImage?: string | null;
   vendorId: VendorId;
   unitPrice: Money;
   quantity: Quantity;
@@ -18,6 +19,7 @@ export interface AddItemInput {
 
 export interface CartProps {
   id: CartId;
+  userId: string;
   items: CartItem[];
   createdAt: Date;
   updatedAt: Date;
@@ -26,6 +28,7 @@ export interface CartProps {
 export class Cart extends AggregateRoot {
   private constructor(
     private readonly _id: CartId,
+    private readonly _userId: string,
     private _items: CartItem[],
     private readonly _createdAt: Date,
     private _updatedAt: Date,
@@ -33,18 +36,22 @@ export class Cart extends AggregateRoot {
     super();
   }
 
-  static create(): Cart {
+  static create(userId: string): Cart {
     const now = new Date();
-    return new Cart(CartId.create(), [], now, now);
+    return new Cart(CartId.create(), userId, [], now, now);
   }
 
   /** Rebuilds a Cart from persisted state — bypasses creation events. */
   static reconstitute(props: CartProps): Cart {
-    return new Cart(props.id, props.items, props.createdAt, props.updatedAt);
+    return new Cart(props.id, props.userId, props.items, props.createdAt, props.updatedAt);
   }
 
   get id(): CartId {
     return this._id;
+  }
+
+  get userId(): string {
+    return this._userId;
   }
 
   get items(): readonly CartItem[] {
@@ -80,6 +87,7 @@ export class Cart extends AggregateRoot {
         new CartItem({
           productId: input.productId,
           productName: input.productName,
+          productImage: input.productImage ?? null,
           vendorId: input.vendorId,
           unitPrice: input.unitPrice,
           quantity: input.quantity,

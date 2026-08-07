@@ -8,6 +8,9 @@ export interface ProductDto {
   priceInCents: number;
   currency: string;
   stockQuantity: number;
+  category: string;
+  features: string[];
+  images: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +24,9 @@ export function toProductDto(product: Product): ProductDto {
     priceInCents: product.price.cents,
     currency: product.price.currencyCode,
     stockQuantity: product.stockQuantity,
+    category: product.category,
+    features: product.features,
+    images: product.images,
     createdAt: product.createdAt.toISOString(),
     updatedAt: product.updatedAt.toISOString(),
   };

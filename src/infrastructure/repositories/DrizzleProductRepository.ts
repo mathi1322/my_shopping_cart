@@ -17,6 +17,9 @@ function toDomain(row: ProductRow): Product {
     description: row.description,
     price: Money.fromCents(row.priceInCents, row.currency),
     stockQuantity: row.stockQuantity,
+    category: row.category,
+    features: row.features,
+    images: row.images,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -34,6 +37,9 @@ export class DrizzleProductRepository implements ProductRepository {
       priceInCents: product.price.cents,
       currency: product.price.currencyCode,
       stockQuantity: product.stockQuantity,
+      category: product.category,
+      features: product.features,
+      images: product.images,
       createdAt: product.createdAt,
       updatedAt: product.updatedAt,
     };
@@ -50,6 +56,9 @@ export class DrizzleProductRepository implements ProductRepository {
           priceInCents: row.priceInCents,
           currency: row.currency,
           stockQuantity: row.stockQuantity,
+          category: row.category,
+          features: row.features,
+          images: row.images,
           updatedAt: row.updatedAt,
         },
       });

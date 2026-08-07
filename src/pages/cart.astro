@@ -1,6 +1,12 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import CartView from '../components/CartView';
+
+export const prerender = false;
+
+if (!Astro.locals.user) {
+  return Astro.redirect('/');
+}
 ---
 
 <Layout title="Your Cart">

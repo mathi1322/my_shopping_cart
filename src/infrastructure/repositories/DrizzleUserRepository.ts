@@ -14,6 +14,12 @@ function toDomain(row: UserRow): User {
     email: Email.fromString(row.email),
     passwordHash: row.passwordHash,
     role: row.role,
+    name: row.name,
+    phone: row.phone,
+    address: row.address,
+    companyName: row.companyName,
+    companyAddress: row.companyAddress,
+    gstNumber: row.gstNumber,
     createdAt: row.createdAt,
   });
 }
@@ -22,16 +28,34 @@ export class DrizzleUserRepository implements UserRepository {
   constructor(private readonly db: Database) {}
 
   async save(user: User): Promise<void> {
+    const row = {
+      id: user.id.toString(),
+      email: user.email.toString(),
+      passwordHash: user.passwordHash,
+      role: user.role,
+      name: user.name,
+      phone: user.phone,
+      address: user.address,
+      companyName: user.companyName,
+      companyAddress: user.companyAddress,
+      gstNumber: user.gstNumber,
+      createdAt: user.createdAt,
+    };
+
     await this.db
       .insert(users)
-      .values({
-        id: user.id.toString(),
-        email: user.email.toString(),
-        passwordHash: user.passwordHash,
-        role: user.role,
-        createdAt: user.createdAt,
-      })
-      .onConflictDoNothing({ target: users.id });
+      .values(row)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          name: row.name,
+          phone: row.phone,
+          address: row.address,
+          companyName: row.companyName,
+          companyAddress: row.companyAddress,
+          gstNumber: row.gstNumber,
+        },
+      });
   }
 
   async findById(id: UserId): Promise<User | null> {

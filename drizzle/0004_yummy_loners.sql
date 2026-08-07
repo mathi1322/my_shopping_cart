@@ -1,0 +1,2 @@
+CREATE TYPE "public"."product_category" AS ENUM('Diagnostic Devices', 'PPE & Masks', 'Personal Care & Fitness', 'Mobility & Support', 'First Aid & Wellness', 'Other');--> statement-breakpoint
+ALTER TABLE "products" ADD COLUMN "category" "product_category" DEFAULT 'Other' NOT NULL;

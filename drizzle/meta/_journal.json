@@ -15,6 +15,34 @@
       "when": 1786048245966,
       "tag": "0001_first_shinobi_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786101214772,
+      "tag": "0002_secret_photon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786104700902,
+      "tag": "0003_lively_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786107852852,
+      "tag": "0004_yummy_loners",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786110985945,
+      "tag": "0005_special_sister_grimm",
+      "breakpoints": true
     }
   ]
 }
