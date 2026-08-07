@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import ProfileTabs from '../../components/ProfileTabs.astro';
 import SellerProductManager from '../../components/SellerProductManager';
 
 export const prerender = false;
@@ -14,14 +15,9 @@ if (user.role !== 'seller') {
 ---
 
 <Layout title="Sell on MediKart">
-  <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
-    <h1 class="text-xl font-bold text-slate-800">My Products</h1>
-    <a
-      href={`/?vendorId=${user.id}`}
-      class="text-sm font-semibold text-brand hover:underline"
-    >
-      View my storefront →
-    </a>
-  </div>
+  <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">My Products</h1>
+
+  <ProfileTabs active="products" userId={user.id} isSeller={true} />
+
   <SellerProductManager client:load vendorId={user.id} />
 </Layout>

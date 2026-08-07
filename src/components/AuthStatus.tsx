@@ -9,6 +9,7 @@ interface Props {
 export default function AuthStatus({ initialUser }: Props) {
   const [user, setUser] = useState<AuthUser | null>(initialUser);
   const [open, setOpen] = useState(false);
+  const [pendingOrderCount, setPendingOrderCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -20,6 +21,29 @@ export default function AuthStatus({ initialUser }: Props) {
     window.addEventListener('auth:changed', handleAuthChanged);
     return () => window.removeEventListener('auth:changed', handleAuthChanged);
   }, []);
+
+  useEffect(() => {
+    if (!user || user.role !== 'seller') {
+      setPendingOrderCount(0);
+      return;
+    }
+    async function loadPendingOrderCount() {
+      try {
+        const res = await fetch('/api/orders/received');
+        if (!res.ok) return;
+        const data = await res.json();
+        const placed = (data.orders as Array<{ status: string }>).filter(
+          (order) => order.status === 'placed',
+        );
+        setPendingOrderCount(placed.length);
+      } catch {
+        setPendingOrderCount(0);
+      }
+    }
+    loadPendingOrderCount();
+    window.addEventListener('orders:updated', loadPendingOrderCount);
+    return () => window.removeEventListener('orders:updated', loadPendingOrderCount);
+  }, [user]);
 
   useEffect(() => {
     if (!open) return;
@@ -86,8 +110,19 @@ export default function AuthStatus({ initialUser }: Props) {
             <p class="truncate text-sm font-semibold text-slate-800">{user.email}</p>
             <p class="text-xs text-slate-400 capitalize">{user.role} account</p>
           </div>
+          {isSeller && (
+            <a
+              href="/sell/dashboard"
+              class="block px-4 py-2 text-sm font-medium text-brand hover:bg-blue-50"
+            >
+              Dashboard
+            </a>
+          )}
           <a href="/profile" class="block px-4 py-2 text-sm text-slate-700 hover:bg-blue-50">
             My Profile
+          </a>
+          <a href="/orders" class="block px-4 py-2 text-sm text-slate-700 hover:bg-blue-50">
+            My Orders
           </a>
           {isSeller && (
             <>
@@ -99,6 +134,17 @@ export default function AuthStatus({ initialUser }: Props) {
                 class="block px-4 py-2 text-sm text-slate-700 hover:bg-blue-50"
               >
                 My Store
+              </a>
+              <a
+                href="/sell/orders"
+                class="flex items-center justify-between px-4 py-2 text-sm text-slate-700 hover:bg-blue-50"
+              >
+                Orders Received
+                {pendingOrderCount > 0 && (
+                  <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-slate-900">
+                    {pendingOrderCount}
+                  </span>
+                )}
               </a>
             </>
           )}

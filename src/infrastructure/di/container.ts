@@ -3,6 +3,7 @@ import { DrizzleProductRepository } from '../repositories/DrizzleProductReposito
 import { DrizzleCartRepository } from '../repositories/DrizzleCartRepository';
 import { DrizzleUserRepository } from '../repositories/DrizzleUserRepository';
 import { DrizzleReviewRepository } from '../repositories/DrizzleReviewRepository';
+import { DrizzleOrderRepository } from '../repositories/DrizzleOrderRepository';
 import { DrizzleSessionStore } from '../auth/DrizzleSessionStore';
 import { ScryptPasswordHasher } from '../auth/ScryptPasswordHasher';
 import { ConsoleDomainEventPublisher } from '../../application/shared/DomainEventPublisher';
@@ -20,11 +21,17 @@ import { RegisterUserUseCase } from '../../application/identity/RegisterUserUseC
 import { AuthenticateUserUseCase } from '../../application/identity/AuthenticateUserUseCase';
 import { ResolveSessionUseCase } from '../../application/identity/ResolveSessionUseCase';
 import { UpdateUserProfileUseCase } from '../../application/identity/UpdateUserProfileUseCase';
+import { PlaceOrderUseCase } from '../../application/order/PlaceOrderUseCase';
+import { CancelOrderUseCase } from '../../application/order/CancelOrderUseCase';
+import { ListOrdersForBuyerUseCase } from '../../application/order/ListOrdersForBuyerUseCase';
+import { ListOrdersForVendorUseCase } from '../../application/order/ListOrdersForVendorUseCase';
+import { GetSellerDashboardUseCase } from '../../application/analytics/GetSellerDashboardUseCase';
 
 const productRepository = new DrizzleProductRepository(db);
 const cartRepository = new DrizzleCartRepository(db);
 const userRepository = new DrizzleUserRepository(db);
 const reviewRepository = new DrizzleReviewRepository(db);
+const orderRepository = new DrizzleOrderRepository(db);
 const sessionStore = new DrizzleSessionStore(db);
 const passwordHasher = new ScryptPasswordHasher();
 const eventPublisher = new ConsoleDomainEventPublisher();
@@ -60,4 +67,9 @@ export const container = {
   authenticateUser: new AuthenticateUserUseCase(userRepository, passwordHasher),
   resolveSession: new ResolveSessionUseCase(sessionStore, userRepository),
   updateUserProfile: new UpdateUserProfileUseCase(userRepository, eventPublisher),
+  placeOrder: new PlaceOrderUseCase(orderRepository, cartRepository, productRepository, eventPublisher),
+  cancelOrder: new CancelOrderUseCase(orderRepository, productRepository, eventPublisher),
+  listOrdersForBuyer: new ListOrdersForBuyerUseCase(orderRepository),
+  listOrdersForVendor: new ListOrdersForVendorUseCase(orderRepository),
+  getSellerDashboard: new GetSellerDashboardUseCase(orderRepository, productRepository),
 };

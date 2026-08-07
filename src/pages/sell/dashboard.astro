@@ -1,0 +1,331 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProfileTabs from '../../components/ProfileTabs.astro';
+import { container } from '../../infrastructure/di/container';
+import { placeholderTile } from '../../lib/ui/placeholderTile';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+if (user.role !== 'seller') {
+  return Astro.redirect('/');
+}
+
+const dashboard = await container.getSellerDashboard.execute(user.id);
+
+function formatMoney(cents: number, currency = dashboard.currency): string {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(
+    cents / 100,
+  );
+}
+
+// Validated categorical palette (dataviz skill, adjacent-pair CVD-safe order) — one fixed
+// color per category NAME, so identity never shifts when ranking/order changes.
+const CATEGORY_COLORS: Record<string, string> = {
+  'Diagnostic Devices': '#2a78d6',
+  'PPE & Masks': '#eb6834',
+  'Personal Care & Fitness': '#1baf7a',
+  'Mobility & Support': '#eda100',
+  'First Aid & Wellness': '#e87ba4',
+  Other: '#008300',
+};
+function categoryColor(category: string): string {
+  return CATEGORY_COLORS[category] ?? CATEGORY_COLORS.Other;
+}
+
+// --- Revenue trend chart geometry (line + area, sequential single hue) ---
+const CHART_W = 760;
+const CHART_H = 220;
+const MARGIN = { top: 16, right: 12, bottom: 28, left: 56 };
+const plotW = CHART_W - MARGIN.left - MARGIN.right;
+const plotH = CHART_H - MARGIN.top - MARGIN.bottom;
+
+function niceMax(value: number): number {
+  if (value <= 0) return 100;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  return niceNormalized * magnitude;
+}
+
+const days = dashboard.last14Days;
+const maxRevenueRupees = Math.max(...days.map((d) => d.revenueInCents / 100), 0);
+const niceMaxRupees = niceMax(maxRevenueRupees);
+const niceMaxCents = niceMaxRupees * 100;
+
+const points = days.map((day, i) => ({
+  x: MARGIN.left + (i / (days.length - 1)) * plotW,
+  y: MARGIN.top + plotH - (niceMaxCents > 0 ? (day.revenueInCents / niceMaxCents) * plotH : 0),
+  day,
+}));
+const linePath = `M ${points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' L ')}`;
+const baselineY = MARGIN.top + plotH;
+const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)},${baselineY} L ${points[0].x.toFixed(1)},${baselineY} Z`;
+
+const gridLines = [0, 0.5, 1].map((fraction) => ({
+  y: MARGIN.top + plotH - fraction * plotH,
+  label: formatMoney(niceMaxCents * fraction),
+}));
+const tickIndices = [0, Math.floor((days.length - 1) / 2), days.length - 1];
+
+const maxTopProductUnits = Math.max(...dashboard.topProducts.map((p) => p.unitsSold), 1);
+const categoryTotalRevenue = dashboard.categoryBreakdown.reduce((sum, c) => sum + c.revenueInCents, 0);
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+---
+
+<Layout title="Seller Dashboard">
+  <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">Dashboard</h1>
+
+  <ProfileTabs active="dashboard" userId={user.id} isSeller={true} />
+
+  {
+    dashboard.totalOrders === 0 ? (
+      <div class="rounded-2xl border border-blue-200 bg-white p-10 text-center">
+        <p class="text-lg font-medium text-slate-700">No orders yet</p>
+        <p class="mt-1 text-sm text-slate-500">
+          Once buyers start ordering your products, your sales, top products, and revenue
+          trends will show up here.
+        </p>
+        <a
+          href="/sell"
+          class="mt-4 inline-block rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+        >
+          Manage my products
+        </a>
+      </div>
+    ) : (
+      <div class="space-y-4">
+        {/* Hero revenue figure + secondary KPI tiles */}
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-blue-200 bg-white p-6">
+            <p class="text-xs font-semibold text-gray-500 uppercase">Total revenue</p>
+            <p class="mt-1 text-[2.75rem] leading-none font-bold text-slate-900">
+              {formatMoney(dashboard.totalRevenueInCents)}
+            </p>
+            {dashboard.revenueDeltaPercent !== null && (
+              <p
+                class={`mt-2 inline-flex items-center gap-1 text-sm font-medium ${
+                  dashboard.revenueDeltaPercent >= 0 ? 'text-[#006300]' : 'text-red-600'
+                }`}
+              >
+                {dashboard.revenueDeltaPercent >= 0 ? '▲' : '▼'}{' '}
+                {Math.abs(dashboard.revenueDeltaPercent)}% vs previous 7 days
+              </p>
+            )}
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:col-span-2">
+            <div class="rounded-2xl border border-blue-200 bg-white p-4">
+              <p class="text-xs font-semibold text-gray-500 uppercase">Orders</p>
+              <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.totalOrders}</p>
+              <p class="mt-1 text-xs text-slate-400">{dashboard.placedOrders} placed</p>
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-white p-4">
+              <p class="text-xs font-semibold text-gray-500 uppercase">Cancelled</p>
+              <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.cancelledOrders}</p>
+              <p class="mt-1 text-xs text-slate-400">{dashboard.cancellationRatePercent}% of orders</p>
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-white p-4">
+              <p class="text-xs font-semibold text-gray-500 uppercase">Customers</p>
+              <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.uniqueCustomers}</p>
+              <p class="mt-1 text-xs text-slate-400">unique buyers</p>
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-white p-4">
+              <p class="text-xs font-semibold text-gray-500 uppercase">Avg order value</p>
+              <p class="mt-1 text-2xl font-bold text-slate-900">
+                {formatMoney(dashboard.averageOrderValueInCents)}
+              </p>
+            </div>
+            <div class="rounded-2xl border border-blue-200 bg-white p-4">
+              <p class="text-xs font-semibold text-gray-500 uppercase">Units sold</p>
+              <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.totalUnitsSold}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Revenue trend + top products */}
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6 lg:col-span-2">
+            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">
+              Revenue — last 14 days
+            </h2>
+            <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} class="h-auto w-full" role="img">
+              {gridLines.map((line) => (
+                <>
+                  <line
+                    x1={MARGIN.left}
+                    x2={CHART_W - MARGIN.right}
+                    y1={line.y}
+                    y2={line.y}
+                    stroke="#e1e0d9"
+                    stroke-width="1"
+                  />
+                  <text x={MARGIN.left - 8} y={line.y} text-anchor="end" dy="0.32em" class="fill-slate-400 text-[10px]">
+                    {line.label}
+                  </text>
+                </>
+              ))}
+              <path d={areaPath} fill="#2a78d6" fill-opacity="0.1" stroke="none" />
+              <path d={linePath} fill="none" stroke="#2a78d6" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+              {points.map((p, i) => (
+                <circle cx={p.x} cy={p.y} r="4" fill="#2a78d6" stroke="#ffffff" stroke-width="2">
+                  <title>
+                    {p.day.label}: {formatMoney(p.day.revenueInCents)} ({p.day.placedCount} order
+                    {p.day.placedCount === 1 ? '' : 's'})
+                  </title>
+                </circle>
+              ))}
+              {points.length > 0 && (
+                <text
+                  x={points[points.length - 1].x}
+                  y={points[points.length - 1].y - 10}
+                  text-anchor="end"
+                  class="fill-slate-700 text-[11px] font-semibold"
+                >
+                  {formatMoney(points[points.length - 1].day.revenueInCents)}
+                </text>
+              )}
+              {tickIndices.map((i) => (
+                <text x={points[i].x} y={CHART_H - 8} text-anchor="middle" class="fill-slate-400 text-[10px]">
+                  {points[i].day.label}
+                </text>
+              ))}
+            </svg>
+          </div>
+
+          <div class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
+            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">Top products</h2>
+            {dashboard.topProducts.length === 0 ? (
+              <p class="text-sm text-slate-500">No sales yet.</p>
+            ) : (
+              <ul class="space-y-3">
+                {dashboard.topProducts.map((product, index) => {
+                  const tile = placeholderTile(product.productName);
+                  return (
+                    <li>
+                      <div class="flex items-center gap-2">
+                        <span class="w-4 shrink-0 text-xs font-semibold text-slate-400">
+                          {index + 1}
+                        </span>
+                        {product.productImage ? (
+                          <img
+                            src={product.productImage}
+                            alt=""
+                            class="h-8 w-8 shrink-0 rounded object-cover"
+                          />
+                        ) : (
+                          <div
+                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded text-xs font-bold text-slate-500/70"
+                            style={{ background: tile.background }}
+                          >
+                            {tile.glyph}
+                          </div>
+                        )}
+                        <a
+                          href={`/products/${product.productId}`}
+                          class="min-w-0 flex-1 truncate text-sm text-slate-700 hover:text-brand hover:underline"
+                        >
+                          {product.productName}
+                        </a>
+                        <span class="shrink-0 text-xs font-semibold text-slate-500">
+                          {product.unitsSold} sold
+                        </span>
+                      </div>
+                      <div class="mt-1 ml-6 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          class="h-full rounded-full bg-[#2a78d6]"
+                          style={{ width: `${(product.unitsSold / maxTopProductUnits) * 100}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Category breakdown + recent orders */}
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
+            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">Revenue by category</h2>
+            <div class="flex h-7 gap-0.5 overflow-hidden rounded-full bg-slate-100">
+              {dashboard.categoryBreakdown.map((cat) => (
+                <div
+                  style={{
+                    width: `${(cat.revenueInCents / categoryTotalRevenue) * 100}%`,
+                    background: categoryColor(cat.category),
+                  }}
+                  title={`${cat.category}: ${formatMoney(cat.revenueInCents)}`}
+                />
+              ))}
+            </div>
+            <ul class="mt-4 space-y-2">
+              {dashboard.categoryBreakdown.map((cat) => (
+                <li class="flex items-center gap-2 text-sm">
+                  <span
+                    class="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: categoryColor(cat.category) }}
+                  />
+                  <span class="min-w-0 flex-1 truncate text-slate-700">{cat.category}</span>
+                  <span class="shrink-0 text-slate-400">
+                    {Math.round((cat.revenueInCents / categoryTotalRevenue) * 100)}%
+                  </span>
+                  <span class="w-24 shrink-0 text-right font-semibold text-slate-800">
+                    {formatMoney(cat.revenueInCents)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
+            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">Recent orders</h2>
+            <div class="overflow-x-auto">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="border-b border-slate-100 text-left text-xs text-slate-400 uppercase">
+                    <th class="py-2 pr-2 font-medium">Order</th>
+                    <th class="py-2 pr-2 font-medium">Buyer</th>
+                    <th class="py-2 pr-2 font-medium">Date</th>
+                    <th class="py-2 pr-2 font-medium">Status</th>
+                    <th class="py-2 pl-2 text-right font-medium">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dashboard.recentOrders.map((order) => (
+                    <tr class="border-b border-slate-50 last:border-0">
+                      <td class="py-2 pr-2 text-slate-500">#{order.id.slice(0, 8)}</td>
+                      <td class="py-2 pr-2 truncate text-slate-700">{order.buyerEmail}</td>
+                      <td class="py-2 pr-2 text-slate-500">{formatDate(order.createdAt)}</td>
+                      <td class="py-2 pr-2">
+                        <span
+                          class={`rounded border px-2 py-0.5 text-xs font-medium ${
+                            order.status === 'placed'
+                              ? 'border-green-200 text-green-700'
+                              : 'border-red-200 text-red-600'
+                          }`}
+                        >
+                          {order.status === 'placed' ? 'Placed' : 'Cancelled'}
+                        </span>
+                      </td>
+                      <td class="py-2 pl-2 text-right font-semibold text-slate-900">
+                        {formatMoney(order.totalInCents)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+</Layout>

@@ -1,0 +1,23 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProfileTabs from '../../components/ProfileTabs.astro';
+import SellerOrders from '../../components/SellerOrders';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+if (user.role !== 'seller') {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title="Orders Received">
+  <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">Orders Received</h1>
+
+  <ProfileTabs active="received" userId={user.id} isSeller={true} />
+
+  <SellerOrders client:load />
+</Layout>

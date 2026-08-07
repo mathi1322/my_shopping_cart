@@ -34,3 +34,10 @@ export class CartItemRemoved implements DomainEvent {
     readonly productId: ProductId,
   ) {}
 }
+
+export class CartCleared implements DomainEvent {
+  readonly name = 'cart.cleared';
+  readonly occurredAt = new Date();
+
+  constructor(readonly cartId: CartId) {}
+}

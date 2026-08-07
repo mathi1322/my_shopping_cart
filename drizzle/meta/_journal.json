@@ -43,6 +43,13 @@
       "when": 1786110985945,
       "tag": "0005_special_sister_grimm",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786127756276,
+      "tag": "0006_curious_amphibian",
+      "breakpoints": true
     }
   ]
 }

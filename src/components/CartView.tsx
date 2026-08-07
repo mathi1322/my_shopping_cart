@@ -18,14 +18,27 @@ interface CartData {
   currency: string;
 }
 
+interface Props {
+  initialAddress: string;
+  initialPhone: string;
+}
+
+type CheckoutStep = 'closed' | 'address' | 'confirm';
+
 function formatMoney(cents: number, currency: string): string {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).format(cents / 100);
 }
 
-export default function CartView() {
+export default function CartView({ initialAddress, initialPhone }: Props) {
   const [cart, setCart] = useState<CartData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingProductId, setPendingProductId] = useState<string | null>(null);
+
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('closed');
+  const [deliveryAddress, setDeliveryAddress] = useState(initialAddress);
+  const [deliveryPhone, setDeliveryPhone] = useState(initialPhone);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [placing, setPlacing] = useState(false);
 
   async function loadCart() {
     const res = await fetch('/api/cart');
@@ -73,6 +86,45 @@ export default function CartView() {
       window.dispatchEvent(new CustomEvent('cart:updated'));
     } finally {
       setPendingProductId(null);
+    }
+  }
+
+  function openCheckout() {
+    setCheckoutError(null);
+    setCheckoutStep('address');
+  }
+
+  function closeCheckout() {
+    setCheckoutStep('closed');
+  }
+
+  function continueToConfirm(event: Event) {
+    event.preventDefault();
+    if (!deliveryAddress.trim() || !deliveryPhone.trim()) return;
+    setCheckoutStep('confirm');
+  }
+
+  async function placeOrder() {
+    setPlacing(true);
+    setCheckoutError(null);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deliveryAddress, deliveryPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setCheckoutError(data.error?.message ?? 'Could not place your order');
+        return;
+      }
+      window.dispatchEvent(new CustomEvent('cart:updated'));
+      window.dispatchEvent(new CustomEvent('orders:updated'));
+      window.location.href = '/orders?placed=1';
+    } catch {
+      setCheckoutError('Network error — please try again');
+    } finally {
+      setPlacing(false);
     }
   }
 
@@ -199,16 +251,132 @@ export default function CartView() {
         </div>
         <button
           type="button"
-          disabled
-          title="Checkout is out of scope for this demo — see ARCHITECTURE.md"
-          class="mt-2 w-full cursor-not-allowed rounded-full bg-brand px-4 py-3 text-sm font-bold tracking-wide text-white uppercase opacity-60"
+          onClick={openCheckout}
+          class="mt-2 w-full rounded-full bg-brand px-4 py-3 text-sm font-bold tracking-wide text-white uppercase hover:bg-brand-dark"
         >
           Place Order
         </button>
-        <p class="mt-2 text-center text-xs text-slate-400">
-          Checkout isn't implemented in this demo.
-        </p>
+        <p class="mt-2 text-center text-xs text-slate-400">Cash on Delivery only, for now.</p>
       </div>
+
+      {checkoutStep !== 'closed' && (
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={closeCheckout}
+        >
+          <div
+            class="w-full max-w-md rounded-2xl border border-blue-200 bg-white p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {checkoutStep === 'address' && (
+              <form onSubmit={continueToConfirm}>
+                <h2 class="mb-4 font-heading text-lg font-bold text-slate-800">
+                  Delivery details
+                </h2>
+                <label class="mb-3 block text-sm">
+                  <span class="mb-1 block font-medium text-slate-600">Delivery address</span>
+                  <textarea
+                    required
+                    value={deliveryAddress}
+                    onInput={(e) => setDeliveryAddress((e.target as HTMLTextAreaElement).value)}
+                    rows={3}
+                    class="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label class="mb-4 block text-sm">
+                  <span class="mb-1 block font-medium text-slate-600">Phone number</span>
+                  <input
+                    type="tel"
+                    required
+                    value={deliveryPhone}
+                    onInput={(e) => setDeliveryPhone((e.target as HTMLInputElement).value)}
+                    class="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </label>
+                <div class="mb-4 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-slate-700">
+                  <label class="flex items-center gap-2">
+                    <input type="radio" checked readonly class="h-4 w-4 accent-[#1341a3]" />
+                    Cash on Delivery
+                  </label>
+                </div>
+                <div class="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closeCheckout}
+                    class="flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="flex-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                  >
+                    Continue
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {checkoutStep === 'confirm' && (
+              <div>
+                <h2 class="mb-4 font-heading text-lg font-bold text-slate-800">
+                  Confirm your order
+                </h2>
+                {checkoutError && (
+                  <p class="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {checkoutError}
+                  </p>
+                )}
+                <ul class="mb-4 max-h-40 space-y-2 overflow-y-auto text-sm text-slate-600">
+                  {cart.items.map((item) => (
+                    <li key={item.productId} class="flex justify-between gap-2">
+                      <span class="truncate">
+                        {item.productName} × {item.quantity}
+                      </span>
+                      <span class="shrink-0 font-medium text-slate-800">
+                        {formatMoney(item.subtotalInCents, cart.currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <div class="mb-4 flex justify-between border-t border-dashed border-slate-200 pt-3 text-sm font-bold text-slate-900">
+                  <span>Total</span>
+                  <span>{formatMoney(cart.totalInCents, cart.currency)}</span>
+                </div>
+                <div class="mb-4 space-y-1 rounded border border-slate-200 px-3 py-2 text-sm text-slate-600">
+                  <p>
+                    <span class="font-medium text-slate-700">Deliver to:</span> {deliveryAddress}
+                  </p>
+                  <p>
+                    <span class="font-medium text-slate-700">Phone:</span> {deliveryPhone}
+                  </p>
+                  <p>
+                    <span class="font-medium text-slate-700">Payment:</span> Cash on Delivery
+                  </p>
+                </div>
+                <div class="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={placing}
+                    onClick={() => setCheckoutStep('address')}
+                    class="flex-1 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={placing}
+                    onClick={placeOrder}
+                    class="flex-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                  >
+                    {placing ? 'Placing…' : 'Confirm Order'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

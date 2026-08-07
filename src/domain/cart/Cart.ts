@@ -6,7 +6,7 @@ import { VendorId } from '../product/VendorId';
 import { CartId } from './CartId';
 import { CartItem } from './CartItem';
 import { Quantity } from './Quantity';
-import { CartItemAdded, CartItemQuantityChanged, CartItemRemoved } from './CartEvents';
+import { CartItemAdded, CartItemQuantityChanged, CartItemRemoved, CartCleared } from './CartEvents';
 
 export interface AddItemInput {
   productId: ProductId;
@@ -116,5 +116,12 @@ export class Cart extends AggregateRoot {
     this._items = this._items.filter((item) => !item.productId.equals(productId));
     this._updatedAt = new Date();
     this.addDomainEvent(new CartItemRemoved(this._id, productId));
+  }
+
+  /** Empties the cart — used after its contents have been turned into an Order. */
+  clear(): void {
+    this._items = [];
+    this._updatedAt = new Date();
+    this.addDomainEvent(new CartCleared(this._id));
   }
 }

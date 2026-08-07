@@ -5,7 +5,12 @@ import { ProductId } from '@/domain/product/ProductId';
 import { VendorId } from '@/domain/product/VendorId';
 import { Money } from '@/domain/shared/Money';
 import { NotFoundError } from '@/domain/shared/DomainError';
-import { CartItemAdded, CartItemQuantityChanged, CartItemRemoved } from '@/domain/cart/CartEvents';
+import {
+  CartItemAdded,
+  CartItemQuantityChanged,
+  CartItemRemoved,
+  CartCleared,
+} from '@/domain/cart/CartEvents';
 
 function addItemInput(overrides: Partial<{ productId: ProductId; quantity: Quantity }> = {}) {
   return {
@@ -91,5 +96,18 @@ describe('Cart', () => {
   it('throws NotFoundError when removing a product that is not in the cart', () => {
     const cart = Cart.create('buyer-1');
     expect(() => cart.removeItem(ProductId.create())).toThrow(NotFoundError);
+  });
+
+  it('empties the cart and records a CartCleared event', () => {
+    const cart = Cart.create('buyer-1');
+    cart.addItem(addItemInput({ quantity: Quantity.of(2) }));
+    cart.addItem(addItemInput({ quantity: Quantity.of(1) }));
+    cart.pullDomainEvents();
+
+    cart.clear();
+
+    expect(cart.isEmpty).toBe(true);
+    expect(cart.total.cents).toBe(0);
+    expect(cart.pullDomainEvents()[0]).toBeInstanceOf(CartCleared);
   });
 });

@@ -1,0 +1,22 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProfileTabs from '../../components/ProfileTabs.astro';
+import MyOrders from '../../components/MyOrders';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const isSeller = user.role === 'seller';
+---
+
+<Layout title="My Orders">
+  <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">My Orders</h1>
+
+  <ProfileTabs active="orders" userId={user.id} isSeller={isSeller} />
+
+  <MyOrders client:load />
+</Layout>

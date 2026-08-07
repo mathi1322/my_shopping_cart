@@ -17,6 +17,9 @@ export const productCategory = pgEnum('product_category', [
   FALLBACK_PRODUCT_CATEGORY,
 ]);
 
+export const orderStatus = pgEnum('order_status', ['placed', 'cancelled']);
+export const paymentMethod = pgEnum('payment_method', ['cod']);
+
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
@@ -95,4 +98,37 @@ export const cartItems = pgTable(
     quantity: integer('quantity').notNull(),
   },
   (table) => [primaryKey({ columns: [table.cartId, table.productId] })],
+);
+
+export const orders = pgTable('orders', {
+  id: text('id').primaryKey(),
+  buyerId: text('buyer_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  buyerEmail: text('buyer_email').notNull(),
+  deliveryAddress: text('delivery_address').notNull(),
+  deliveryPhone: varchar('delivery_phone', { length: 20 }).notNull(),
+  paymentMethod: paymentMethod('payment_method').notNull().default('cod'),
+  status: orderStatus('status').notNull().default('placed'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const orderItems = pgTable(
+  'order_items',
+  {
+    orderId: text('order_id')
+      .notNull()
+      .references(() => orders.id, { onDelete: 'cascade' }),
+    // Not a live FK: an order is a historical snapshot that must survive the
+    // product being edited or deleted later (see productName/vendorId below).
+    productId: text('product_id').notNull(),
+    productName: varchar('product_name', { length: 200 }).notNull(),
+    productImage: text('product_image'),
+    vendorId: text('vendor_id').notNull(),
+    unitPriceInCents: integer('unit_price_in_cents').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('INR'),
+    quantity: integer('quantity').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.orderId, table.productId] })],
 );

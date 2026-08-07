@@ -1,0 +1,28 @@
+---
+interface Props {
+  active: 'dashboard' | 'settings' | 'orders' | 'products' | 'store' | 'received';
+  userId: string;
+  isSeller: boolean;
+}
+
+const { active, userId, isSeller } = Astro.props;
+
+function tabClass(tab: string): string {
+  return tab === active
+    ? 'rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white'
+    : 'rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-brand hover:bg-blue-50';
+}
+---
+
+<div class="mb-4 flex flex-wrap gap-2">
+  {isSeller && <a href="/sell/dashboard" class={tabClass('dashboard')}>Dashboard</a>}
+  <a href="/profile" class={tabClass('settings')}>Settings</a>
+  <a href="/orders" class={tabClass('orders')}>My Orders</a>
+  {isSeller && <a href="/sell" class={tabClass('products')}>My Products</a>}
+  {isSeller && <a href={`/?vendorId=${userId}`} class={tabClass('store')}>My Store</a>}
+  {isSeller && (
+    <a href="/sell/orders" class={tabClass('received')}>
+      Orders Received
+    </a>
+  )}
+</div>

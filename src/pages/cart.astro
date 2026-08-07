@@ -10,5 +10,9 @@ if (!Astro.locals.user) {
 ---
 
 <Layout title="Your Cart">
-  <CartView client:load />
+  <CartView
+    client:load
+    initialAddress={Astro.locals.user.address ?? ''}
+    initialPhone={Astro.locals.user.phone ?? ''}
+  />
 </Layout>

@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import ProfileTabs from '../../components/ProfileTabs.astro';
 import ProfileSettingsForm from '../../components/ProfileSettingsForm';
 
 export const prerender = false;
@@ -15,21 +16,7 @@ const isSeller = user.role === 'seller';
 <Layout title="My Profile">
   <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">My Profile</h1>
 
-  {
-    isSeller && (
-      <div class="mb-4 flex gap-2">
-        <span class="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white">
-          Settings
-        </span>
-        <a
-          href={`/?vendorId=${user.id}`}
-          class="rounded-full border border-blue-200 px-4 py-2 text-sm font-semibold text-brand hover:bg-blue-50"
-        >
-          My Store
-        </a>
-      </div>
-    )
-  }
+  <ProfileTabs active="settings" userId={user.id} isSeller={isSeller} />
 
   <ProfileSettingsForm
     client:load
