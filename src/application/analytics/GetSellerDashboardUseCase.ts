@@ -122,6 +122,11 @@ export class GetSellerDashboardUseCase {
       .sort((a, b) => b.unitsSold - a.unitsSold)
       .slice(0, TOP_PRODUCTS_LIMIT);
 
+    // Category is looked up live against the current Product, not snapshotted on
+    // OrderItem — so if a seller recategorizes a product after selling it, past
+    // revenue reports under the new category rather than what it was at sale time.
+    // Acceptable for a reporting view; would need a snapshot column if this ever
+    // has to match point-in-time financial records exactly.
     const categoryTotals = new Map<string, CategoryStat>();
     for (const [productId, stat] of productStats) {
       const product = await this.productRepository.findById(ProductId.fromString(productId));
