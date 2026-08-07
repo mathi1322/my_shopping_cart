@@ -1,0 +1,19 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import SellerProductManager from '../../components/SellerProductManager';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect('/login');
+}
+if (user.role !== 'seller') {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title="Sell on ShopKart">
+  <h1 class="mb-4 text-xl font-bold text-slate-800">My Products</h1>
+  <SellerProductManager client:load vendorId={user.id} />
+</Layout>

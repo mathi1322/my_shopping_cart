@@ -1,0 +1,89 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AddToCartControl from '../components/AddToCartControl';
+import { container } from '../infrastructure/di/container';
+import { placeholderTile } from '../lib/ui/placeholderTile';
+
+const allProducts = await container.listProducts.execute();
+
+const query = Astro.url.searchParams.get('q')?.trim() ?? '';
+const products = query
+  ? allProducts.filter((product) => {
+      const haystack = `${product.name} ${product.description}`.toLowerCase();
+      return haystack.includes(query.toLowerCase());
+    })
+  : allProducts;
+
+function formatMoney(cents: number, currency: string): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(cents / 100);
+}
+---
+
+<Layout title="Products" searchQuery={query}>
+  {
+    query && (
+      <p class="mb-4 text-sm text-slate-500">
+        {products.length} result{products.length === 1 ? '' : 's'} for <b>“{query}”</b> ·{' '}
+        <a href="/" class="text-[#2874f0] hover:underline">
+          Clear search
+        </a>
+      </p>
+    )
+  }
+
+  {
+    products.length === 0 ? (
+      <div class="rounded bg-white p-10 text-center shadow-sm">
+        <p class="text-lg font-medium text-slate-700">No products found</p>
+        <p class="mt-1 text-sm text-slate-500">
+          {query ? 'Try a different search term.' : 'Run the seed script to add demo products.'}
+        </p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        {products.map((product) => {
+          const tile = placeholderTile(product.name);
+          return (
+            <article class="flex flex-col overflow-hidden rounded bg-white shadow-sm transition hover:shadow-lg">
+              <div
+                class="flex aspect-square items-center justify-center text-4xl font-bold text-slate-500/70"
+                style={{ background: tile.background }}
+              >
+                {tile.glyph}
+              </div>
+              <div class="flex flex-1 flex-col p-3 sm:p-4">
+                <h2 class="line-clamp-2 text-sm font-medium text-slate-800 sm:text-base">
+                  {product.name}
+                </h2>
+                <p class="mt-1 line-clamp-2 text-xs text-slate-500">{product.description}</p>
+
+                <div class="mt-2 flex items-baseline gap-2">
+                  <span class="text-lg font-bold text-slate-900">
+                    {formatMoney(product.priceInCents, product.currency)}
+                  </span>
+                </div>
+
+                <p
+                  class={`mt-1 text-xs font-medium ${
+                    product.stockQuantity > 0 ? 'text-green-600' : 'text-red-500'
+                  }`}
+                >
+                  {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'}
+                  <span class="font-normal text-slate-400"> · sold by {product.vendorId}</span>
+                </p>
+
+                <div class="mt-auto pt-3">
+                  <AddToCartControl
+                    client:load
+                    productId={product.id}
+                    stockQuantity={product.stockQuantity}
+                  />
+                </div>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    )
+  }
+</Layout>

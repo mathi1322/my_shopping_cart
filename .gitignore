@@ -1,0 +1,23 @@
+# build output
+dist/
+.astro/
+
+# dependencies
+node_modules/
+
+# env
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# coverage
+coverage/
+
+# editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json

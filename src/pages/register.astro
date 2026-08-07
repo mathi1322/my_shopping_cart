@@ -1,0 +1,14 @@
+---
+import Layout from '../layouts/Layout.astro';
+import RegisterForm from '../components/RegisterForm';
+
+export const prerender = false;
+
+if (Astro.locals.user) {
+  return Astro.redirect('/');
+}
+---
+
+<Layout title="Create account">
+  <RegisterForm client:load />
+</Layout>
