@@ -2,7 +2,6 @@
 import Layout from '../../layouts/Layout.astro';
 import ProfileTabs from '../../components/ProfileTabs.astro';
 import { container } from '../../infrastructure/di/container';
-import { placeholderTile } from '../../lib/ui/placeholderTile';
 
 export const prerender = false;
 
@@ -38,8 +37,10 @@ function categoryColor(category: string): string {
 
 // --- Revenue trend chart geometry (line + area, sequential single hue) ---
 const CHART_W = 760;
-const CHART_H = 220;
-const MARGIN = { top: 16, right: 12, bottom: 28, left: 56 };
+const CHART_H = 232;
+// top has extra headroom vs bottom/sides — the last point's direct value label sits
+// above its dot, and needs room to avoid getting clipped by the SVG viewport edge.
+const MARGIN = { top: 28, right: 12, bottom: 28, left: 56 };
 const plotW = CHART_W - MARGIN.left - MARGIN.right;
 const plotH = CHART_H - MARGIN.top - MARGIN.bottom;
 
@@ -71,8 +72,65 @@ const gridLines = [0, 0.5, 1].map((fraction) => ({
 }));
 const tickIndices = [0, Math.floor((days.length - 1) / 2), days.length - 1];
 
-const maxTopProductUnits = Math.max(...dashboard.topProducts.map((p) => p.unitsSold), 1);
 const categoryTotalRevenue = dashboard.categoryBreakdown.reduce((sum, c) => sum + c.revenueInCents, 0);
+
+// --- Top products donut (top 3 by revenue + "Other products") ---
+// Fixed slot colors (validated categorical order) — assigned by rank position in
+// THIS chart, not carried between page loads, since "top 3" itself can reshuffle
+// day to day; "Other products" gets a neutral gray so it never impersonates a real product.
+const PRODUCT_SLOT_COLORS = ['#2a78d6', '#eb6834', '#1baf7a'];
+const OTHERS_COLOR = '#898781';
+
+const byRevenue = [...dashboard.topProducts].sort((a, b) => b.revenueInCents - a.revenueInCents);
+const top3ByRevenue = byRevenue.slice(0, 3);
+const top3RevenueSum = top3ByRevenue.reduce((sum, p) => sum + p.revenueInCents, 0);
+const top3UnitsSum = top3ByRevenue.reduce((sum, p) => sum + p.unitsSold, 0);
+const othersRevenueInCents = Math.max(0, dashboard.totalRevenueInCents - top3RevenueSum);
+const othersUnitsSold = Math.max(0, dashboard.totalUnitsSold - top3UnitsSum);
+
+const donutSlices = [
+  ...top3ByRevenue.map((product, i) => ({
+    label: product.productName,
+    productId: product.productId as string | null,
+    revenueInCents: product.revenueInCents,
+    unitsSold: product.unitsSold,
+    color: PRODUCT_SLOT_COLORS[i],
+  })),
+  ...(othersRevenueInCents > 0
+    ? [
+        {
+          label: 'Other products',
+          productId: null as string | null,
+          revenueInCents: othersRevenueInCents,
+          unitsSold: othersUnitsSold,
+          color: OTHERS_COLOR,
+        },
+      ]
+    : []),
+];
+
+const DONUT_SIZE = 180;
+const DONUT_R = 70;
+const DONUT_CENTER = DONUT_SIZE / 2;
+const DONUT_STROKE = 28;
+const DONUT_CIRC = 2 * Math.PI * DONUT_R;
+const DONUT_GAP = donutSlices.length > 1 ? 3 : 0;
+const donutTotal = donutSlices.reduce((sum, slice) => sum + slice.revenueInCents, 0);
+
+let donutCumulative = 0;
+const donutArcs = donutSlices.map((slice) => {
+  const fraction = donutTotal > 0 ? slice.revenueInCents / donutTotal : 0;
+  const fullLength = fraction * DONUT_CIRC;
+  const dashLength = Math.max(0, fullLength - DONUT_GAP);
+  const dashoffset = DONUT_CIRC - donutCumulative;
+  donutCumulative += fullLength;
+  return {
+    ...slice,
+    percent: Math.round(fraction * 100),
+    dasharray: `${dashLength} ${DONUT_CIRC - dashLength}`,
+    dashoffset,
+  };
+});
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
@@ -184,7 +242,7 @@ function formatDate(iso: string): string {
               {points.length > 0 && (
                 <text
                   x={points[points.length - 1].x}
-                  y={points[points.length - 1].y - 10}
+                  y={Math.max(points[points.length - 1].y - 10, 10)}
                   text-anchor="end"
                   class="fill-slate-700 text-[11px] font-semibold"
                 >
@@ -200,53 +258,88 @@ function formatDate(iso: string): string {
           </div>
 
           <div class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
-            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">Top products</h2>
-            {dashboard.topProducts.length === 0 ? (
+            <h2 class="mb-3 font-heading text-sm font-bold text-gray-600">
+              Top products by revenue
+            </h2>
+            {donutSlices.length === 0 ? (
               <p class="text-sm text-slate-500">No sales yet.</p>
             ) : (
-              <ul class="space-y-3">
-                {dashboard.topProducts.map((product, index) => {
-                  const tile = placeholderTile(product.productName);
-                  return (
-                    <li>
-                      <div class="flex items-center gap-2">
-                        <span class="w-4 shrink-0 text-xs font-semibold text-slate-400">
-                          {index + 1}
-                        </span>
-                        {product.productImage ? (
-                          <img
-                            src={product.productImage}
-                            alt=""
-                            class="h-8 w-8 shrink-0 rounded object-cover"
-                          />
-                        ) : (
-                          <div
-                            class="flex h-8 w-8 shrink-0 items-center justify-center rounded text-xs font-bold text-slate-500/70"
-                            style={{ background: tile.background }}
-                          >
-                            {tile.glyph}
-                          </div>
-                        )}
+              <>
+                <div class="flex justify-center">
+                  <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} class="h-40 w-40" role="img">
+                    <circle
+                      cx={DONUT_CENTER}
+                      cy={DONUT_CENTER}
+                      r={DONUT_R}
+                      fill="none"
+                      stroke="#e1e0d9"
+                      stroke-width={DONUT_STROKE}
+                    />
+                    {donutArcs.map((arc) => (
+                      <circle
+                        cx={DONUT_CENTER}
+                        cy={DONUT_CENTER}
+                        r={DONUT_R}
+                        fill="none"
+                        stroke={arc.color}
+                        stroke-width={DONUT_STROKE}
+                        stroke-dasharray={arc.dasharray}
+                        stroke-dashoffset={arc.dashoffset}
+                        transform={`rotate(-90 ${DONUT_CENTER} ${DONUT_CENTER})`}
+                      >
+                        <title>
+                          {arc.label}: {formatMoney(arc.revenueInCents)} ({arc.percent}% ·{' '}
+                          {arc.unitsSold} sold)
+                        </title>
+                      </circle>
+                    ))}
+                    <text
+                      x={DONUT_CENTER}
+                      y={DONUT_CENTER - 6}
+                      text-anchor="middle"
+                      class="fill-slate-400 text-[9px] font-semibold uppercase"
+                    >
+                      Revenue
+                    </text>
+                    <text
+                      x={DONUT_CENTER}
+                      y={DONUT_CENTER + 12}
+                      text-anchor="middle"
+                      class="fill-slate-900 text-[15px] font-bold"
+                    >
+                      {formatMoney(donutTotal)}
+                    </text>
+                  </svg>
+                </div>
+
+                <ul class="mt-4 space-y-2">
+                  {donutArcs.map((arc) => (
+                    <li class="flex items-center gap-2 text-sm">
+                      <span
+                        class="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{ background: arc.color }}
+                      />
+                      {arc.productId ? (
                         <a
-                          href={`/products/${product.productId}`}
-                          class="min-w-0 flex-1 truncate text-sm text-slate-700 hover:text-brand hover:underline"
+                          href={`/products/${arc.productId}`}
+                          class="min-w-0 flex-1 truncate text-slate-700 hover:text-brand hover:underline"
                         >
-                          {product.productName}
+                          {arc.label}
                         </a>
-                        <span class="shrink-0 text-xs font-semibold text-slate-500">
-                          {product.unitsSold} sold
+                      ) : (
+                        <span class="min-w-0 flex-1 truncate text-slate-500 italic">
+                          {arc.label}
                         </span>
-                      </div>
-                      <div class="mt-1 ml-6 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div
-                          class="h-full rounded-full bg-[#2a78d6]"
-                          style={{ width: `${(product.unitsSold / maxTopProductUnits) * 100}%` }}
-                        />
-                      </div>
+                      )}
+                      <span class="shrink-0 text-xs text-slate-400">{arc.unitsSold} sold</span>
+                      <span class="w-16 shrink-0 text-right font-semibold text-slate-800">
+                        {formatMoney(arc.revenueInCents)}
+                      </span>
+                      <span class="w-9 shrink-0 text-right text-slate-400">{arc.percent}%</span>
                     </li>
-                  );
-                })}
-              </ul>
+                  ))}
+                </ul>
+              </>
             )}
           </div>
         </div>
