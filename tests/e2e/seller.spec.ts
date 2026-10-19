@@ -25,15 +25,15 @@ test('a seller registers, lists a product, edits it, and deletes it', async ({ p
   await page.getByPlaceholder('Price (INR)').fill('1299');
   await page.getByPlaceholder('Stock quantity').fill('7');
 
-  // Plain-http images are rejected for new listings.
+  // Plain-http images are rejected as soon as they're added (no preview, nothing sent).
   await page.getByPlaceholder('Image URL (https://…)').fill('http://cdn.example/oximeter.jpg');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
-  await page.getByRole('button', { name: /add product/i }).click();
-  await expect(page.getByText('Image URLs must start with https://')).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveText('Image URLs must start with https://');
+  await expect(page.getByRole('button', { name: 'Remove image' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Remove image' }).click();
   await page.getByPlaceholder('Image URL (https://…)').fill('https://127.0.0.1:9/oximeter.jpg');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove image' })).toHaveCount(1);
   await page.getByRole('button', { name: /add product/i }).click();
 
   const listing = page.getByRole('listitem').filter({ hasText: name });

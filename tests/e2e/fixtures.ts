@@ -42,6 +42,7 @@ export async function registerViaApi(
 
 export interface CreatedProduct {
   id: string;
+  vendorId: string;
   name: string;
   priceInCents: number;
   stockQuantity: number;
@@ -63,6 +64,25 @@ export async function createProductViaApi(
   });
   expect(response.status(), await response.text()).toBe(201);
   return response.json();
+}
+
+/** Sets the seller's company name — what shoppers see as "Sold by". */
+export async function setCompanyName(
+  seller: APIRequestContext,
+  companyName: string,
+): Promise<void> {
+  const response = await seller.put('/api/users/me', { data: { companyName } });
+  expect(response.status(), await response.text()).toBe(200);
+}
+
+/** Places an order for one unit of a product with the buyer's own API client. */
+export async function buyViaApi(buyer: APIRequestContext, productId: string): Promise<string> {
+  await buyer.post('/api/cart/items', { data: { productId, quantity: 1 } });
+  const response = await buyer.post('/api/orders', {
+    data: { deliveryAddress: '1 Test Street', deliveryPhone: '9876543210' },
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  return (await response.json()).id;
 }
 
 export async function stockOf(request: APIRequestContext, productId: string): Promise<number> {
@@ -114,13 +134,45 @@ export const test = base.extend<{
     await Promise.all(contexts.map((context) => context.dispose()));
   },
 
-  /** Fails any test whose pages throw an uncaught exception. */
+  /** Fails any test whose pages throw an uncaught exception or violate the CSP. */
   pageErrors: [
-    async ({ page }, use) => {
+    async ({ page, browserName }, use) => {
       const errors: Error[] = [];
-      page.on('pageerror', (error) => errors.push(error));
+      const cspViolations: string[] = [];
+      page.on('pageerror', (error) => {
+        // WebKit reports a fetch interrupted by a test-driven navigation as a page error
+        // even when the app catches it (reproduced with a fully caught fetch). Chromium and
+        // Firefox still catch any genuinely unhandled request failure.
+        const webkitInterruptedFetch =
+          browserName === 'webkit' && /due to access control checks\.?$/.test(error.message);
+        if (!webkitInterruptedFetch) errors.push(error);
+      });
+      // Report every Content-Security-Policy violation, in every browser engine.
+      await page.addInitScript(() => {
+        document.addEventListener('securitypolicyviolation', (event) => {
+          const target =
+            event.target instanceof Element ? event.target.outerHTML.slice(0, 160) : '';
+          console.error(
+            `[csp-violation] ${event.violatedDirective} blocked ${event.blockedURI || 'inline'}` +
+              ` at ${event.sourceFile}:${event.lineNumber} sample=${event.sample} target=${target}`,
+          );
+        });
+      });
+      page.on('console', (message) => {
+        const text = message.text();
+        if (!text.startsWith('[csp-violation]')) return;
+        // WebKit reports its own native rendering of <select> as an inline-style violation
+        // even when the element has no style attribute; nothing is blocked that we set.
+        const webkitSelectFalsePositive =
+          text.includes('style-src-attr') && /target=<select (?![^>]*\bstyle=)/.test(text);
+        if (!webkitSelectFalsePositive) cspViolations.push(text);
+      });
       await use(errors);
-      expect(errors, 'uncaught page errors').toEqual([]);
+      expect(
+        errors.map((error) => `${error.message}\n${error.stack ?? ''}`),
+        'uncaught page errors',
+      ).toEqual([]);
+      expect(cspViolations, 'Content-Security-Policy violations').toEqual([]);
     },
     { auto: true },
   ],

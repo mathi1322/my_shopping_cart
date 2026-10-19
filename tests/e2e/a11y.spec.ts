@@ -3,6 +3,9 @@ import type { Page } from '@playwright/test';
 import { test, expect, createProductViaApi, gotoHydrated, registerViaApi } from './fixtures';
 
 test.skip(({ browserName }) => browserName !== 'chromium', 'one engine is enough for axe');
+// axe injects its own script/styles and re-fetches stylesheets, which the CSP would
+// (correctly) block; the CSP itself is checked by every other test.
+test.use({ bypassCSP: true });
 
 interface Violation {
   where: string;
@@ -31,7 +34,7 @@ test('pages and interactive states meet WCAG 2 A/AA', async ({ page, browser, ba
   const violations: Violation[] = [];
 
   // Seller with a product, logged in on its own page.
-  const sellerContext = await browser.newContext({ baseURL });
+  const sellerContext = await browser.newContext({ baseURL, bypassCSP: true });
   const sellerPage = await sellerContext.newPage();
   await registerViaApi(sellerPage.request, 'seller');
   const product = await createProductViaApi(sellerPage.request);
@@ -73,7 +76,7 @@ test('pages and interactive states meet WCAG 2 A/AA', async ({ page, browser, ba
   await page.getByRole('button', { name: 'Account menu' }).click();
   violations.push(...(await audit(page, 'account menu open')));
 
-  // Seller pages, now that there is a sale.
+  // Seller pages, now that there is a sale (orders show "Mark as shipped").
   for (const path of ['/sell', '/sell/orders', '/sell/dashboard']) {
     await gotoHydrated(sellerPage, path);
     violations.push(...(await audit(sellerPage, path)));
@@ -85,6 +88,25 @@ test('pages and interactive states meet WCAG 2 A/AA', async ({ page, browser, ba
     .getByRole('button', { name: /edit/i })
     .click();
   violations.push(...(await audit(sellerPage, '/sell (editing a product)')));
+
+  // Deliver the order: the buyer's orders page and the product's review form.
+  const { orders } = await (await page.request.get('/api/orders')).json();
+  for (const status of ['shipped', 'delivered']) {
+    await sellerPage.request.post(`/api/orders/${orders[0].id}/fulfillment`, { data: { status } });
+  }
+  await gotoHydrated(page, '/orders');
+  violations.push(...(await audit(page, '/orders (delivered)')));
+  await gotoHydrated(page, `/products/${product.id}`);
+  await expect(page.getByRole('heading', { name: 'Write a review' })).toBeVisible();
+  violations.push(...(await audit(page, 'product page with review form')));
+
+  // A storefront long enough to paginate.
+  for (let i = 0; i < 12; i += 1) {
+    await createProductViaApi(sellerPage.request);
+  }
+  await gotoHydrated(page, `/?vendorId=${product.vendorId}`);
+  await expect(page.getByRole('navigation', { name: 'Pagination' })).toBeVisible();
+  violations.push(...(await audit(page, 'catalog with pagination')));
   await sellerContext.close();
 
   if (process.env.A11Y_REPORT) {

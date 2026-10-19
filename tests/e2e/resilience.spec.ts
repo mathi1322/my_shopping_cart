@@ -2,7 +2,7 @@ import { test, expect, createProductViaApi, gotoHydrated, registerViaApi } from 
 
 test('the cart page shows an error instead of hanging when the API fails', async ({ page }) => {
   await registerViaApi(page.request, 'buyer');
-  await page.route('**/api/cart', (route) =>
+  await page.route(/\/api\/cart(\?|$)/, (route) =>
     route.fulfill({
       status: 500,
       contentType: 'application/json',
@@ -16,7 +16,7 @@ test('the cart page shows an error instead of hanging when the API fails', async
 
 test('the orders page shows an error when the network is down', async ({ page }) => {
   await registerViaApi(page.request, 'buyer');
-  await page.route('**/api/orders', (route) => route.abort('internetdisconnected'));
+  await page.route(/\/api\/orders(\?|$)/, (route) => route.abort('internetdisconnected'));
 
   await gotoHydrated(page, '/orders');
   await expect(page.getByRole('alert')).toContainText('Network error');
@@ -45,7 +45,7 @@ test('a cart action after the session expired shows a message, not a crash', asy
 test('seller pages show an error when loading fails', async ({ page }) => {
   await registerViaApi(page.request, 'seller');
   await page.route('**/api/products?vendorId=*', (route) => route.abort('failed'));
-  await page.route('**/api/orders/received', (route) =>
+  await page.route(/\/api\/orders\/received(\?|$)/, (route) =>
     route.fulfill({ status: 503, contentType: 'text/html', body: '<h1>Bad gateway</h1>' }),
   );
 

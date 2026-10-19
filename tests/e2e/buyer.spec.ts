@@ -48,7 +48,9 @@ test('a buyer registers, buys a product, sees the order, and cancels it', async 
 
   await expect(page).toHaveURL(/\/orders\?placed=1/);
   await expect(page.getByRole('link', { name: product.name }).first()).toBeVisible();
-  await expect(page.getByText('Placed', { exact: true })).toBeVisible();
+  // The order badge (items carry their own "Placed" badges too).
+  await expect(page.getByText('Placed', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(`Sold by ${'MediKart seller'}`).first()).toBeVisible();
   expect(await stockOf(page.request, product.id)).toBe(3);
 
   // The cart is empty afterwards.

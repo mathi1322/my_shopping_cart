@@ -38,8 +38,16 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
     { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile-chrome', use: { ...devices['Pixel 7'] }, testMatch: /buyer\.spec\.ts/ },
-    { name: 'mobile-safari', use: { ...devices['iPhone 14'] }, testMatch: /buyer\.spec\.ts/ },
+    {
+      name: 'mobile-chrome',
+      use: { ...devices['Pixel 7'] },
+      testMatch: /(buyer|catalog|fulfillment-reviews)\.spec\.ts/,
+    },
+    {
+      name: 'mobile-safari',
+      use: { ...devices['iPhone 14'] },
+      testMatch: /(buyer|catalog|fulfillment-reviews)\.spec\.ts/,
+    },
   ],
   webServer: externalBaseURL
     ? undefined
