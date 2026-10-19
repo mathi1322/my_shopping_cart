@@ -44,8 +44,11 @@ Concurrency is handled with row locks taken through `find…ForUpdate` repositor
 
 - Checkout locks the buyer's cart first (a double-submitted checkout waits, then finds the cart empty), then locks each product in id order (so two checkouts sharing products can't deadlock), and decrements stock with a conditional `UPDATE … WHERE stock_quantity >= n` as a last line of defence against overselling.
 - Cancel locks the order row, so a concurrent second cancel waits, then fails the already-cancelled check — stock is only ever restored once.
+- Cart changes (`AddItemToCart`, `UpdateCartItemQuantity`, `RemoveCartItem`) lock the cart row too, so concurrent edits — a double-click, or two tabs — can't overwrite each other's load-modify-save. A user's first cart is created with `INSERT … ON CONFLICT (user_id) DO NOTHING`, because right after login the header's cart badge and an add-to-cart routinely race to create it.
 
-Stock changes at checkout/cancel are direct `decrementStock`/`incrementStock` updates rather than load-mutate-save of the `Product` aggregate, so they don't raise `ProductUpdated`. These behaviours are covered by concurrent-request tests in `tests/integration/api/orders.test.ts`.
+Stock changes at checkout/cancel are direct `decrementStock`/`incrementStock` updates rather than load-mutate-save of the `Product` aggregate, so they don't raise `ProductUpdated`. These behaviours are covered by concurrent-request tests in `tests/integration/api/orders.test.ts` and `cart.test.ts`.
+
+On the client, every island request goes through `lib/ui/fetchJson.ts`, which never throws: network failures, aborted requests and API errors come back as a message the component displays, rather than an unhandled rejection or a crash on an error body (e.g. after a session expires).
 
 ### Domain events
 
@@ -57,7 +60,7 @@ Aggregates (`Product`, `Cart`, `Order`, `User`) record domain events (`ProductCr
 
 **Password hashing** uses Node's built-in `scrypt` (`infrastructure/auth/ScryptPasswordHasher.ts`) via a domain-owned `PasswordHasher` interface (`domain/identity/PasswordHasher.ts`) — same pattern as a repository: the domain declares the port, infrastructure implements it. No bcrypt/argon2 dependency needed for a project this size.
 
-**Hardening.** The session cookie is `Secure` in production builds (override with `COOKIE_SECURE`). Login is rate-limited per client+email and per client, and registration per client (`lib/http/rateLimit.ts`, answering 429 with `Retry-After`); the limiter is in-process memory, which fits this single-process deployment and would need a shared store if the app is scaled out. An unknown email still runs the password KDF, so login timing doesn't reveal which accounts exist. Expired sessions are purged whenever a new session is created. The middleware also sets baseline security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`).
+**Hardening.** The session cookie is `Secure` whenever the request arrives over HTTPS, directly or via a trusted proxy's `X-Forwarded-Proto` (override with `COOKIE_SECURE`). It is deliberately not `Secure` on plain-HTTP localhost: Safari drops `Secure` cookies there, so login would silently fail in the Docker demo (the e2e suite's WebKit run caught this). Login is rate-limited per client+email and per client, and registration per client (`lib/http/rateLimit.ts`, answering 429 with `Retry-After`); the limiter is in-process memory, which fits this single-process deployment and would need a shared store if the app is scaled out. An unknown email still runs the password KDF, so login timing doesn't reveal which accounts exist. Expired sessions are purged whenever a new session is created. The middleware also sets baseline security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`).
 
 **Where authorization checks live**, split by what kind of question they answer:
 

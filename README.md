@@ -73,7 +73,7 @@ Stop everything with `docker compose down` (add `-v` to also drop the Postgres v
 
 ### Deploying beyond localhost
 
-Set `ALLOWED_HOSTS` (comma-separated public hostnames, e.g. `ALLOWED_HOSTS=shop.example.com`) when building the image. Astro only trusts the `Host`/`X-Forwarded-*` headers for allowed hosts; without it, same-origin checks reject logout and order cancellation and every visitor shares one rate-limit bucket. Serve the app over HTTPS (the session cookie is `Secure` in production) behind a reverse proxy that overwrites `X-Forwarded-For`, and don't expose the app port directly. See `.env.example` for `COOKIE_SECURE`.
+Set `ALLOWED_HOSTS` (comma-separated public hostnames, e.g. `ALLOWED_HOSTS=shop.example.com`) when building the image. Astro only trusts the `Host`/`X-Forwarded-*` headers for allowed hosts; without it, same-origin checks reject logout and order cancellation and every visitor shares one rate-limit bucket. Serve the app over HTTPS behind a reverse proxy that sets `X-Forwarded-Proto` (the session cookie is marked `Secure` from it) and overwrites `X-Forwarded-For`, and don't expose the app port directly. See `.env.example` for `COOKIE_SECURE`.
 
 ## Local development (without Docker)
 
@@ -93,6 +93,7 @@ npm run dev
 npm run test              # unit tests — domain + application layers, no I/O
 npm run test:coverage     # same, with coverage
 npm run test:integration  # integration tests — real Postgres required (DATABASE_URL env var)
+npm run test:e2e          # browser tests — Playwright, against the production build
 ```
 
 Integration tests exercise the actual Drizzle repositories and the actual Astro API route handlers against a real database — nothing is mocked at that layer. Point `DATABASE_URL` at a disposable database before running them, e.g.:
@@ -105,7 +106,19 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5433/shopping_cart_test npm 
 
 **Note:** the integration suite truncates every table before each test file runs (`tests/integration/setupDb.ts`), so it refuses to run unless the database name contains `test`. Always point it at a disposable database, never at your development or seeded one.
 
-CI (`.github/workflows/ci.yml`) runs formatting, lint, typecheck, unit tests, integration tests against a Postgres service, the production build, and a runtime dependency audit on every push and pull request.
+### End-to-end (browser) tests
+
+`tests/e2e/` drives the production build in Chromium, Firefox and WebKit (Safari's engine), plus Pixel and iPhone viewports for the buyer journey: registration and login (including keyboard-only and the add-to-cart login modal), browsing, cart, checkout, price and stock changes during checkout, order cancellation, seller listing management, the seller dashboard, an axe WCAG 2 A/AA audit of every page and interactive state, behaviour when the API or network fails, and HTTP-level security checks. Each test creates its own users and products, so it only needs a migrated test database:
+
+```sh
+npx playwright install chromium firefox webkit   # once
+npm run build
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/shopping_cart_test npm run test:e2e
+```
+
+Set `E2E_BASE_URL` (e.g. `https://localhost:8443`) to run the same suite against an already-running deployment, such as the Docker image behind a TLS proxy, instead of starting the build locally.
+
+CI (`.github/workflows/ci.yml`) runs formatting, lint, typecheck, unit tests, integration tests against a Postgres service, the production build, a runtime dependency audit, the browser suite on all three engines, and a Docker image build on every push and pull request.
 
 ## API reference
 
