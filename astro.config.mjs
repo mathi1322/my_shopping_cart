@@ -25,6 +25,25 @@ export default defineConfig({
 
   security: {
     allowedDomains: trustedHostnames.map((hostname) => ({ hostname })),
+    // Content-Security-Policy for every page (sent as a header by the Node adapter).
+    // Astro adds hashes for its own inline scripts/styles, so script-src and
+    // style-src stay free of 'unsafe-inline' — which is why the UI uses no inline
+    // style attributes.
+    csp: {
+      directives: [
+        "default-src 'self'",
+        // Sellers link product photos hosted elsewhere (https only, see Product).
+        "img-src 'self' https: data:",
+        "font-src 'self' https://fonts.gstatic.com",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+      ],
+      scriptDirective: { resources: ["'self'"] },
+      styleDirective: { resources: ["'self'", 'https://fonts.googleapis.com'] },
+    },
   },
 
   adapter: node({

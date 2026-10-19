@@ -9,6 +9,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
+/**
+ * Pages get their Content-Security-Policy from Astro (astro.config.mjs). Anything
+ * without one — API JSON, redirects — gets a policy that allows nothing at all.
+ */
+const FALLBACK_CSP = "default-src 'none'; frame-ancestors 'none'";
+
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
@@ -39,12 +45,15 @@ export const onRequest = defineMiddleware(async (context, next) => {
   context.locals.user = sessionId ? await container.resolveSession.execute(sessionId) : null;
 
   const response = await next();
-  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
-    try {
+  try {
+    for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       response.headers.set(name, value);
-    } catch {
-      // Some responses (e.g. Response.redirect) have immutable headers; skip those.
     }
+    if (!response.headers.has('Content-Security-Policy')) {
+      response.headers.set('Content-Security-Policy', FALLBACK_CSP);
+    }
+  } catch {
+    // Some responses (e.g. Response.redirect) have immutable headers; skip those.
   }
   return response;
 });

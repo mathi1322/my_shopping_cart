@@ -1,3 +1,5 @@
+import type { OrderStatus } from '../../domain/order/Order';
+
 export interface TopProductStat {
   productId: string;
   productName: string;
@@ -24,7 +26,7 @@ export interface RecentOrderStat {
   id: string;
   buyerEmail: string;
   createdAt: string;
-  status: 'placed' | 'cancelled';
+  status: OrderStatus;
   itemCount: number;
   totalInCents: number;
 }

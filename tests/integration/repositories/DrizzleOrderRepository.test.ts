@@ -84,9 +84,55 @@ describe('DrizzleOrderRepository', () => {
     const second = placeOrder(sellerId);
     await repository.save(second);
 
-    const found = await repository.findByBuyerId(buyerId);
-    expect(found).toHaveLength(2);
-    expect(found[0].id.equals(second.id)).toBe(true);
+    const found = await repository.findPageByBuyerId(buyerId, { limit: 10, offset: 0 });
+    expect(found.total).toBe(2);
+    expect(found.items[0].id.equals(second.id)).toBe(true);
+
+    const secondPage = await repository.findPageByBuyerId(buyerId, { limit: 1, offset: 1 });
+    expect(secondPage.total).toBe(2);
+    expect(secondPage.items.map((o) => o.id.toString())).toEqual([first.id.toString()]);
+  });
+
+  it('persists item fulfillment status and the derived order status', async () => {
+    const sellerA = (await seedTestUser(db, 'seller')).id;
+    const sellerB = (await seedTestUser(db, 'seller')).id;
+    const order = Order.place({
+      buyerId,
+      buyerEmail: 'buyer@medikart.test',
+      items: [mkItem(sellerA), mkItem(sellerB)],
+      deliveryAddress: '221B Baker Street',
+      deliveryPhone: '9876543210',
+    });
+    order.advanceFulfillment(VendorId.fromString(sellerA), 'shipped');
+    await repository.save(order);
+
+    const found = await repository.findById(order.id);
+    expect(found?.status).toBe('shipped');
+    expect(found?.statusFor(VendorId.fromString(sellerA))).toBe('shipped');
+    expect(found?.statusFor(VendorId.fromString(sellerB))).toBe('placed');
+
+    expect(await repository.countAwaitingShipment(VendorId.fromString(sellerA))).toBe(0);
+    expect(await repository.countAwaitingShipment(VendorId.fromString(sellerB))).toBe(1);
+
+    const vendorPage = await repository.findPageByVendorId(VendorId.fromString(sellerB), {
+      limit: 10,
+      offset: 0,
+    });
+    expect(vendorPage.total).toBe(1);
+  });
+
+  it('knows whether a buyer has received a product', async () => {
+    const sellerId = (await seedTestUser(db, 'seller')).id;
+    const order = placeOrder(sellerId);
+    const productId = order.items[0].productId;
+    await repository.save(order);
+    expect(await repository.hasDeliveredItem(buyerId, productId)).toBe(false);
+
+    order.advanceFulfillment(VendorId.fromString(sellerId), 'shipped');
+    order.advanceFulfillment(VendorId.fromString(sellerId), 'delivered');
+    await repository.save(order);
+    expect(await repository.hasDeliveredItem(buyerId, productId)).toBe(true);
+    expect(await repository.hasDeliveredItem('someone-else', productId)).toBe(false);
   });
 
   it('finds orders containing at least one item from the given vendor', async () => {

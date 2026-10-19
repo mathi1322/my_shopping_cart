@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { placeholderTile } from '../lib/ui/placeholderTile';
 import { fetchJson } from '../lib/ui/fetchJson';
+import { orderStatusStyle, type OrderStatusValue } from '../lib/ui/orderStatus';
 
 interface OrderItem {
   productId: string;
@@ -12,13 +13,28 @@ interface OrderItem {
   subtotalInCents: number;
 }
 
+interface OrdersPage {
+  orders: OrderDto[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+/** The one action a seller can take next on their items in an order. */
+const NEXT_STEP: Partial<
+  Record<OrderStatusValue, { status: 'shipped' | 'delivered'; label: string }>
+> = {
+  placed: { status: 'shipped', label: 'Mark as shipped' },
+  shipped: { status: 'delivered', label: 'Mark as delivered' },
+};
+
 interface OrderDto {
   id: string;
   buyerEmail: string;
   items: OrderItem[];
   deliveryAddress: string;
   deliveryPhone: string;
-  status: 'placed' | 'cancelled';
+  status: OrderStatusValue;
   currency: string;
   createdAt: string;
 }
@@ -38,21 +54,54 @@ function formatDate(iso: string): string {
 export default function SellerOrders() {
   const [orders, setOrders] = useState<OrderDto[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [pageInfo, setPageInfo] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  async function load(page = 1) {
+    const result = await fetchJson<OrdersPage>(`/api/orders/received?page=${page}`);
+    if (!result.ok) {
+      if (page === 1) setLoadError(result.message);
+      else setError(result.message);
+      return;
+    }
+    setLoadError(null);
+    const { orders: pageOrders, totalPages, total } = result.data;
+    setOrders((current) => (page === 1 || !current ? pageOrders : [...current, ...pageOrders]));
+    setPageInfo({ page, totalPages, total });
+  }
 
   useEffect(() => {
-    async function load() {
-      const result = await fetchJson<{ orders: OrderDto[] }>('/api/orders/received');
-      if (!result.ok) {
-        setLoadError(result.message);
-        return;
-      }
-      setLoadError(null);
-      setOrders(result.data.orders);
-    }
     load();
-    window.addEventListener('orders:updated', load);
-    return () => window.removeEventListener('orders:updated', load);
   }, []);
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await load(pageInfo.page + 1);
+    setLoadingMore(false);
+  }
+
+  async function advance(orderId: string, status: 'shipped' | 'delivered') {
+    setError(null);
+    setUpdatingId(orderId);
+    const result = await fetchJson<OrderDto>(`/api/orders/${orderId}/fulfillment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    setUpdatingId(null);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    const updated = result.data;
+    setOrders((current) =>
+      current ? current.map((order) => (order.id === orderId ? updated : order)) : current,
+    );
+    // Lets the header refresh its "to ship" badge.
+    window.dispatchEvent(new CustomEvent('orders:updated'));
+  }
 
   if (!orders) {
     return loadError ? (
@@ -77,6 +126,11 @@ export default function SellerOrders() {
 
   return (
     <div class="space-y-4">
+      {error && (
+        <p role="alert" class="rounded bg-red-50 px-4 py-2 text-sm text-red-700">
+          {error}
+        </p>
+      )}
       {orders.map((order) => {
         const itemsTotal = order.items.reduce((sum, item) => sum + item.subtotalInCents, 0);
         return (
@@ -89,15 +143,23 @@ export default function SellerOrders() {
                   <span class="font-medium text-slate-600">Buyer:</span> {order.buyerEmail}
                 </p>
               </div>
-              <span
-                class={`rounded border px-2 py-1 text-xs font-medium ${
-                  order.status === 'placed'
-                    ? 'border-green-200 text-green-700'
-                    : 'border-red-200 text-red-600'
-                }`}
-              >
-                {order.status === 'placed' ? 'Placed' : 'Cancelled'}
-              </span>
+              <div class="flex flex-col items-end gap-2">
+                <span
+                  class={`rounded px-2 py-1 text-xs font-medium ${orderStatusStyle(order.status).classes}`}
+                >
+                  {orderStatusStyle(order.status).label}
+                </span>
+                {NEXT_STEP[order.status] && (
+                  <button
+                    type="button"
+                    disabled={updatingId === order.id}
+                    onClick={() => advance(order.id, NEXT_STEP[order.status]!.status)}
+                    class="bg-brand hover:bg-brand-dark rounded-full px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  >
+                    {updatingId === order.id ? 'Updating…' : NEXT_STEP[order.status]!.label}
+                  </button>
+                )}
+              </div>
             </div>
 
             <ul class="divide-y divide-slate-100">
@@ -107,8 +169,7 @@ export default function SellerOrders() {
                   <li key={item.productId} class="flex gap-3 py-3">
                     <a
                       href={`/products/${item.productId}`}
-                      class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded text-base font-bold text-slate-500/70"
-                      style={item.productImage ? undefined : { background: tile.background }}
+                      class={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded text-base font-bold text-slate-500/70 ${item.productImage ? '' : tile.className}`}
                     >
                       {item.productImage ? (
                         <img src={item.productImage} alt="" class="h-full w-full object-cover" />
@@ -151,6 +212,19 @@ export default function SellerOrders() {
           </div>
         );
       })}
+
+      {pageInfo.page < pageInfo.totalPages && (
+        <div class="text-center">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            class="border-brand text-brand rounded-full border bg-white px-5 py-2 text-sm font-semibold hover:bg-blue-50 disabled:opacity-60"
+          >
+            {loadingMore ? 'Loading…' : `Load more orders (${orders.length} of ${pageInfo.total})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

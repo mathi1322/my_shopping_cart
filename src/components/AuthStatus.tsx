@@ -30,13 +30,10 @@ export default function AuthStatus({ initialUser }: Props) {
     }
     async function loadPendingOrderCount() {
       try {
-        const res = await fetch('/api/orders/received');
+        const res = await fetch('/api/orders/received?pageSize=1');
         if (!res.ok) return;
-        const data = await res.json();
-        const placed = (data.orders as Array<{ status: string }>).filter(
-          (order) => order.status === 'placed',
-        );
-        setPendingOrderCount(placed.length);
+        const data = (await res.json()) as { awaitingShipmentCount: number };
+        setPendingOrderCount(data.awaitingShipmentCount);
       } catch {
         setPendingOrderCount(0);
       }
@@ -86,8 +83,7 @@ export default function AuthStatus({ initialUser }: Props) {
         class="flex items-center gap-1.5 rounded-full py-1 pr-2 pl-1 hover:bg-white/10"
       >
         <span
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-slate-700"
-          style={{ background: tile.background }}
+          class={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-slate-700 ${tile.className}`}
         >
           {tile.glyph}
         </span>

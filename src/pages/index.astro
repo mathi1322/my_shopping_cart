@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import AddToCartControl from '../components/AddToCartControl';
+import Pagination from '../components/Pagination.astro';
 import { container } from '../infrastructure/di/container';
 import { placeholderTile } from '../lib/ui/placeholderTile';
 
@@ -11,38 +12,36 @@ const PRICE_BANDS = [
 ];
 
 const vendorIdFilter = Astro.url.searchParams.get('vendorId')?.trim() ?? '';
-const allProducts = await container.listProducts.execute(
-  vendorIdFilter ? { vendorId: vendorIdFilter } : {},
-);
-
 const query = Astro.url.searchParams.get('q')?.trim() ?? '';
 const selectedCategories = Astro.url.searchParams.getAll('category');
 const priceBandValue = Astro.url.searchParams.get('priceBand') ?? '';
 const inStockOnly = Astro.url.searchParams.get('inStock') === '1';
 const selectedPriceBand = PRICE_BANDS.find((band) => band.value === priceBandValue);
+const requestedPage = Number(Astro.url.searchParams.get('page') ?? '1');
 
-const availableCategories = [...new Set(allProducts.map((product) => product.category))].sort();
+const result = await container.searchProducts.execute({
+  vendorId: vendorIdFilter || undefined,
+  text: query || undefined,
+  categories: selectedCategories,
+  minPriceCents: selectedPriceBand?.min,
+  maxPriceCents:
+    selectedPriceBand && Number.isFinite(selectedPriceBand.max) ? selectedPriceBand.max : undefined,
+  inStockOnly,
+  page: Number.isFinite(requestedPage) ? requestedPage : 1,
+});
+const { products, categories: availableCategories, total, page, totalPages } = result;
 
-let products = allProducts;
-if (query) {
-  products = products.filter((product) => {
-    const haystack = `${product.name} ${product.description}`.toLowerCase();
-    return haystack.includes(query.toLowerCase());
-  });
+// A page past the end (e.g. after filters narrowed the results) goes to the last real page.
+if (page > totalPages) {
+  const params = new URLSearchParams(Astro.url.searchParams);
+  params.set('page', String(totalPages));
+  return Astro.redirect(`/?${params.toString()}`);
 }
-if (selectedCategories.length > 0) {
-  products = products.filter((product) => selectedCategories.includes(product.category));
-}
-if (selectedPriceBand) {
-  products = products.filter(
-    (product) =>
-      product.priceInCents >= selectedPriceBand.min &&
-      product.priceInCents <= selectedPriceBand.max,
-  );
-}
-if (inStockOnly) {
-  products = products.filter((product) => product.stockQuantity > 0);
-}
+
+const vendorName = vendorIdFilter
+  ? ((await container.vendorDirectory.displayNames([vendorIdFilter])).get(vendorIdFilter) ??
+    'this seller')
+  : '';
 
 const hasActiveFilters = selectedCategories.length > 0 || !!selectedPriceBand || inStockOnly;
 const isOwnStorefront = !!vendorIdFilter && vendorIdFilter === Astro.locals.user?.id;
@@ -54,6 +53,7 @@ function buildUrl(
     priceBand?: string;
     inStock?: boolean;
     vendorId?: string;
+    page?: number;
   } = {},
 ): string {
   const params = new URLSearchParams();
@@ -68,6 +68,8 @@ function buildUrl(
   if (band) params.set('priceBand', band);
   if (stock) params.set('inStock', '1');
   if (vendorId) params.set('vendorId', vendorId);
+  // Changing a filter starts again from page 1; only explicit page links keep a page.
+  if (overrides.page && overrides.page > 1) params.set('page', String(overrides.page));
 
   const qs = params.toString();
   return qs ? `/?${qs}` : '/';
@@ -82,8 +84,8 @@ function formatMoney(cents: number, currency: string): string {
   {
     vendorIdFilter && (
       <p class="mb-4 text-sm text-slate-500">
-        Showing products from {isOwnStorefront ? 'your store' : 'this seller'} ·{' '}
-        <a href={buildUrl({ vendorId: '' })} class="text-brand hover:underline">
+        Showing products from {isOwnStorefront ? 'your store' : <b>{vendorName}</b>} ·{' '}
+        <a href={buildUrl({ vendorId: '' })} class="text-brand underline">
           View all products
         </a>
       </p>
@@ -92,7 +94,7 @@ function formatMoney(cents: number, currency: string): string {
   {
     query && (
       <p class="mb-4 text-sm text-slate-500">
-        {products.length} result{products.length === 1 ? '' : 's'} for <b>“{query}”</b> ·{' '}
+        {total} result{total === 1 ? '' : 's'} for <b>“{query}”</b> ·{' '}
         <a href={buildUrl({ q: '' })} class="text-brand hover:underline">
           Clear search
         </a>
@@ -229,8 +231,7 @@ function formatMoney(cents: number, currency: string): string {
                       />
                     ) : (
                       <div
-                        class="flex aspect-square items-center justify-center text-4xl font-bold text-slate-500/70"
-                        style={{ background: tile.background }}
+                        class={`flex aspect-square items-center justify-center text-4xl font-bold text-slate-500/70 ${tile.className}`}
                       >
                         {tile.glyph}
                       </div>
@@ -265,9 +266,17 @@ function formatMoney(cents: number, currency: string): string {
                           {product.category}
                         </span>
                       </div>
-                      <p class="mt-1 text-xs text-slate-500">sold by {product.vendorId}</p>
                     </div>
                   </a>
+                  <p class="px-4 text-xs text-slate-500 sm:px-6">
+                    Sold by{' '}
+                    <a
+                      href={buildUrl({ vendorId: product.vendorId, q: '', categories: [] })}
+                      class="text-brand hover:underline"
+                    >
+                      {product.vendorName}
+                    </a>
+                  </p>
 
                   <div class="px-4 pb-4 sm:px-6 sm:pb-6">
                     <AddToCartControl
@@ -283,6 +292,14 @@ function formatMoney(cents: number, currency: string): string {
           </div>
         )
       }
+      <Pagination
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={result.pageSize}
+        hrefFor={(n) => buildUrl({ page: n })}
+        itemLabel="products"
+      />
     </div>
   </div>
 </Layout>

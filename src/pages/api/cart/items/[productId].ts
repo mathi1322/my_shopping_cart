@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { container } from '../../../../infrastructure/di/container';
 import { updateCartItemSchema } from '../../../../lib/validation/cartSchemas';
-import { toCartDto } from '../../../../application/cart/CartDto';
+import { presentCart } from '../../../../application/cart/CartDto';
 import { jsonResponse } from '../../../../lib/http/jsonResponse';
 import { toErrorResponse } from '../../../../lib/http/errorResponse';
 import { requireUser } from '../../../../lib/http/requireUser';
@@ -20,7 +20,7 @@ export const PUT: APIRoute = async ({ params, request, locals }) => {
       quantity: input.quantity,
     });
 
-    return jsonResponse(toCartDto(cart));
+    return jsonResponse(await presentCart(cart, container.vendorDirectory));
   } catch (error) {
     return toErrorResponse(error);
   }
@@ -33,7 +33,7 @@ export const DELETE: APIRoute = async ({ params, locals }) => {
       userId: requestingUser.id,
       productId: params.productId!,
     });
-    return jsonResponse(toCartDto(cart));
+    return jsonResponse(await presentCart(cart, container.vendorDirectory));
   } catch (error) {
     return toErrorResponse(error);
   }

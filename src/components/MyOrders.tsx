@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'preact/hooks';
 import { placeholderTile } from '../lib/ui/placeholderTile';
 import { fetchJson } from '../lib/ui/fetchJson';
+import { orderStatusStyle, type OrderStatusValue } from '../lib/ui/orderStatus';
 
 interface OrderItem {
   productId: string;
   productName: string;
   productImage: string | null;
   vendorId: string;
+  vendorName: string;
   unitPriceInCents: number;
   quantity: number;
   subtotalInCents: number;
+  fulfillmentStatus: 'placed' | 'shipped' | 'delivered';
+}
+
+interface OrdersPage {
+  orders: OrderDto[];
+  page: number;
+  totalPages: number;
+  total: number;
 }
 
 interface OrderDto {
@@ -18,7 +28,7 @@ interface OrderDto {
   deliveryAddress: string;
   deliveryPhone: string;
   paymentMethod: string;
-  status: 'placed' | 'cancelled';
+  status: OrderStatusValue;
   totalInCents: number;
   currency: string;
   createdAt: string;
@@ -43,15 +53,30 @@ export default function MyOrders() {
   const [justPlaced, setJustPlaced] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [pageInfo, setPageInfo] = useState<{ page: number; totalPages: number; total: number }>({
+    page: 1,
+    totalPages: 1,
+    total: 0,
+  });
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  async function loadOrders() {
-    const result = await fetchJson<{ orders: OrderDto[] }>('/api/orders');
+  async function loadOrders(page = 1) {
+    const result = await fetchJson<OrdersPage>(`/api/orders?page=${page}`);
     if (!result.ok) {
-      setLoadError(result.message);
+      if (page === 1) setLoadError(result.message);
+      else setError(result.message);
       return;
     }
     setLoadError(null);
-    setOrders(result.data.orders);
+    const { orders: pageOrders, totalPages, total } = result.data;
+    setOrders((current) => (page === 1 || !current ? pageOrders : [...current, ...pageOrders]));
+    setPageInfo({ page, totalPages, total });
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await loadOrders(pageInfo.page + 1);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
@@ -122,13 +147,9 @@ export default function MyOrders() {
               <p class="text-sm text-slate-500">Placed on {formatDate(order.createdAt)}</p>
             </div>
             <span
-              class={`rounded border px-2 py-1 text-xs font-medium ${
-                order.status === 'placed'
-                  ? 'border-green-200 text-green-700'
-                  : 'border-red-200 text-red-600'
-              }`}
+              class={`rounded px-2 py-1 text-xs font-medium ${orderStatusStyle(order.status).classes}`}
             >
-              {order.status === 'placed' ? 'Placed' : 'Cancelled'}
+              {orderStatusStyle(order.status).label}
             </span>
           </div>
 
@@ -139,8 +160,7 @@ export default function MyOrders() {
                 <li key={item.productId} class="flex gap-3 py-3">
                   <a
                     href={`/products/${item.productId}`}
-                    class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded text-base font-bold text-slate-500/70"
-                    style={item.productImage ? undefined : { background: tile.background }}
+                    class={`flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded text-base font-bold text-slate-500/70 ${item.productImage ? '' : tile.className}`}
                   >
                     {item.productImage ? (
                       <img src={item.productImage} alt="" class="h-full w-full object-cover" />
@@ -155,7 +175,26 @@ export default function MyOrders() {
                     >
                       {item.productName}
                     </a>
-                    <p class="text-xs text-slate-500">Qty {item.quantity}</p>
+                    <p class="text-xs text-slate-500">
+                      Qty {item.quantity} · Sold by {item.vendorName}
+                    </p>
+                    {order.status !== 'cancelled' && (
+                      <p class="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                        <span
+                          class={`rounded px-1.5 py-0.5 font-medium ${orderStatusStyle(item.fulfillmentStatus).classes}`}
+                        >
+                          {orderStatusStyle(item.fulfillmentStatus).label}
+                        </span>
+                        {item.fulfillmentStatus === 'delivered' && (
+                          <a
+                            href={`/products/${item.productId}#write-review`}
+                            class="text-brand font-medium hover:underline"
+                          >
+                            Write a review
+                          </a>
+                        )}
+                      </p>
+                    )}
                   </div>
                   <p class="shrink-0 self-center text-sm font-semibold text-slate-900">
                     {formatMoney(item.subtotalInCents, order.currency)}
@@ -193,6 +232,19 @@ export default function MyOrders() {
           </div>
         </div>
       ))}
+
+      {pageInfo.page < pageInfo.totalPages && (
+        <div class="text-center">
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            class="border-brand text-brand rounded-full border bg-white px-5 py-2 text-sm font-semibold hover:bg-blue-50 disabled:opacity-60"
+          >
+            {loadingMore ? 'Loading…' : `Load more orders (${orders.length} of ${pageInfo.total})`}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

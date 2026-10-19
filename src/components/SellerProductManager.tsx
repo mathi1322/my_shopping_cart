@@ -46,10 +46,18 @@ interface ImageUrlsFieldProps {
 
 function ImageUrlsField({ images, onChange }: ImageUrlsFieldProps) {
   const [urlInput, setUrlInput] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
 
   function addUrl() {
     const url = urlInput.trim();
     if (!url) return;
+    // Same rule as the server, checked up front: the page's CSP only loads https images,
+    // so an http URL could neither be previewed nor shown to shoppers.
+    if (!/^https:\/\/\S+$/i.test(url)) {
+      setUrlError('Image URLs must start with https://');
+      return;
+    }
+    setUrlError(null);
     onChange([...images, url]);
     setUrlInput('');
   }
@@ -83,6 +91,11 @@ function ImageUrlsField({ images, onChange }: ImageUrlsFieldProps) {
           Add
         </button>
       </div>
+      {urlError && (
+        <p role="alert" class="mt-1 text-xs text-red-700">
+          {urlError}
+        </p>
+      )}
       {images.length > 0 && (
         <div class="mt-2 flex flex-wrap gap-2">
           {images.map((url, index) => (
@@ -119,15 +132,32 @@ export default function SellerProductManager({ vendorId }: Props) {
   const [editDraft, setEditDraft] = useState(emptyForm);
   const [savingId, setSavingId] = useState<string | null>(null);
 
-  async function loadProducts() {
-    const result = await fetchJson<{ products: ProductDto[] }>(
-      `/api/products?vendorId=${encodeURIComponent(vendorId)}`,
-    );
+  const [pageInfo, setPageInfo] = useState({ page: 1, totalPages: 1, total: 0 });
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  /** Page 1 replaces the list (e.g. after a change); later pages append ("Load more"). */
+  async function loadProducts(page = 1) {
+    const result = await fetchJson<{
+      products: ProductDto[];
+      page: number;
+      totalPages: number;
+      total: number;
+    }>(`/api/products?vendorId=${encodeURIComponent(vendorId)}&page=${page}&pageSize=24`);
     if (!result.ok) {
       setError(`Could not load your products: ${result.message}`);
       return;
     }
-    setProducts(result.data.products);
+    const { products: pageProducts, totalPages, total } = result.data;
+    setProducts((current) =>
+      page === 1 || !current ? pageProducts : [...current, ...pageProducts],
+    );
+    setPageInfo({ page, totalPages, total });
+  }
+
+  async function loadMore() {
+    setLoadingMore(true);
+    await loadProducts(pageInfo.page + 1);
+    setLoadingMore(false);
   }
 
   useEffect(() => {
@@ -303,7 +333,7 @@ export default function SellerProductManager({ vendorId }: Props) {
 
       <div class="rounded bg-white shadow-sm">
         <p class="border-b border-slate-100 px-4 py-3 text-sm font-medium text-slate-500 uppercase">
-          Your listings {products ? `(${products.length})` : ''}
+          Your listings {products ? `(${pageInfo.total})` : ''}
         </p>
 
         {!products ? (
@@ -438,6 +468,20 @@ export default function SellerProductManager({ vendorId }: Props) {
               ),
             )}
           </ul>
+        )}
+        {products && pageInfo.page < pageInfo.totalPages && (
+          <div class="border-t border-slate-100 p-4 text-center">
+            <button
+              type="button"
+              onClick={loadMore}
+              disabled={loadingMore}
+              class="border-brand text-brand rounded-full border bg-white px-5 py-2 text-sm font-semibold hover:bg-blue-50 disabled:opacity-60"
+            >
+              {loadingMore
+                ? 'Loading…'
+                : `Load more listings (${products.length} of ${pageInfo.total})`}
+            </button>
+          </div>
         )}
       </div>
     </div>

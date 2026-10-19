@@ -3,6 +3,11 @@ import { ProductId } from '../product/ProductId';
 import { VendorId } from '../product/VendorId';
 import { Quantity } from '../cart/Quantity';
 
+/** Where one line item is in delivery. Each seller advances their own items. */
+export type FulfillmentStatus = 'placed' | 'shipped' | 'delivered';
+
+export const FULFILLMENT_STEPS: readonly FulfillmentStatus[] = ['placed', 'shipped', 'delivered'];
+
 export interface OrderItemProps {
   productId: ProductId;
   productName: string;
@@ -10,11 +15,21 @@ export interface OrderItemProps {
   vendorId: VendorId;
   unitPrice: Money;
   quantity: Quantity;
+  /** Defaults to 'placed' for a newly placed order. */
+  fulfillmentStatus?: FulfillmentStatus;
 }
 
 /** Snapshotted at order placement time — never drifts if the product changes afterwards. */
 export class OrderItem {
   constructor(private readonly props: OrderItemProps) {}
+
+  get fulfillmentStatus(): FulfillmentStatus {
+    return this.props.fulfillmentStatus ?? 'placed';
+  }
+
+  withFulfillmentStatus(status: FulfillmentStatus): OrderItem {
+    return new OrderItem({ ...this.props, fulfillmentStatus: status });
+  }
 
   get productId(): ProductId {
     return this.props.productId;

@@ -4,6 +4,7 @@ import { DrizzleCartRepository } from '../repositories/DrizzleCartRepository';
 import { DrizzleUserRepository } from '../repositories/DrizzleUserRepository';
 import { DrizzleReviewRepository } from '../repositories/DrizzleReviewRepository';
 import { DrizzleOrderRepository } from '../repositories/DrizzleOrderRepository';
+import { DrizzleVendorDirectory } from '../repositories/DrizzleVendorDirectory';
 import { DrizzleSessionStore } from '../auth/DrizzleSessionStore';
 import { ScryptPasswordHasher } from '../auth/ScryptPasswordHasher';
 import { DrizzleUnitOfWork } from '../db/DrizzleUnitOfWork';
@@ -12,8 +13,9 @@ import { CreateProductUseCase } from '../../application/product/CreateProductUse
 import { UpdateProductUseCase } from '../../application/product/UpdateProductUseCase';
 import { DeleteProductUseCase } from '../../application/product/DeleteProductUseCase';
 import { GetProductUseCase } from '../../application/product/GetProductUseCase';
-import { ListProductsUseCase } from '../../application/product/ListProductsUseCase';
-import { ListReviewsForProductUseCase } from '../../application/review/ListReviewsForProductUseCase';
+import { SearchProductsUseCase } from '../../application/product/SearchProductsUseCase';
+import { GetProductReviewsUseCase } from '../../application/review/GetProductReviewsUseCase';
+import { WriteReviewUseCase } from '../../application/review/WriteReviewUseCase';
 import { GetOrCreateCartUseCase } from '../../application/cart/GetOrCreateCartUseCase';
 import { AddItemToCartUseCase } from '../../application/cart/AddItemToCartUseCase';
 import { UpdateCartItemQuantityUseCase } from '../../application/cart/UpdateCartItemQuantityUseCase';
@@ -26,6 +28,7 @@ import { PlaceOrderUseCase } from '../../application/order/PlaceOrderUseCase';
 import { CancelOrderUseCase } from '../../application/order/CancelOrderUseCase';
 import { ListOrdersForBuyerUseCase } from '../../application/order/ListOrdersForBuyerUseCase';
 import { ListOrdersForVendorUseCase } from '../../application/order/ListOrdersForVendorUseCase';
+import { AdvanceOrderFulfillmentUseCase } from '../../application/order/AdvanceOrderFulfillmentUseCase';
 import { GetSellerDashboardUseCase } from '../../application/analytics/GetSellerDashboardUseCase';
 
 const productRepository = new DrizzleProductRepository(db);
@@ -37,6 +40,7 @@ const sessionStore = new DrizzleSessionStore(db);
 const passwordHasher = new ScryptPasswordHasher();
 const eventPublisher = new ConsoleDomainEventPublisher();
 const unitOfWork = new DrizzleUnitOfWork(db);
+const vendorDirectory = new DrizzleVendorDirectory(db);
 
 const getOrCreateCart = new GetOrCreateCartUseCase(cartRepository);
 
@@ -48,9 +52,16 @@ export const container = {
   createProduct: new CreateProductUseCase(productRepository, eventPublisher),
   updateProduct: new UpdateProductUseCase(productRepository, eventPublisher),
   deleteProduct: new DeleteProductUseCase(productRepository, eventPublisher),
-  getProduct: new GetProductUseCase(productRepository),
-  listProducts: new ListProductsUseCase(productRepository),
-  listReviewsForProduct: new ListReviewsForProductUseCase(reviewRepository),
+  getProduct: new GetProductUseCase(productRepository, vendorDirectory),
+  searchProducts: new SearchProductsUseCase(productRepository, vendorDirectory),
+  getProductReviews: new GetProductReviewsUseCase(reviewRepository, orderRepository),
+  writeReview: new WriteReviewUseCase(
+    reviewRepository,
+    orderRepository,
+    productRepository,
+    userRepository,
+  ),
+  vendorDirectory,
   getOrCreateCart,
   addItemToCart: new AddItemToCartUseCase(unitOfWork, eventPublisher),
   updateCartItemQuantity: new UpdateCartItemQuantityUseCase(unitOfWork, eventPublisher),
@@ -62,7 +73,8 @@ export const container = {
   updateUserProfile: new UpdateUserProfileUseCase(userRepository, eventPublisher),
   placeOrder: new PlaceOrderUseCase(unitOfWork, cartRepository, eventPublisher),
   cancelOrder: new CancelOrderUseCase(unitOfWork, eventPublisher),
-  listOrdersForBuyer: new ListOrdersForBuyerUseCase(orderRepository),
+  listOrdersForBuyer: new ListOrdersForBuyerUseCase(orderRepository, vendorDirectory),
   listOrdersForVendor: new ListOrdersForVendorUseCase(orderRepository),
+  advanceOrderFulfillment: new AdvanceOrderFulfillmentUseCase(unitOfWork, eventPublisher),
   getSellerDashboard: new GetSellerDashboardUseCase(orderRepository, productRepository),
 };

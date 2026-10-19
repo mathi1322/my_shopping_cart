@@ -87,4 +87,55 @@ describe('DrizzleProductRepository', () => {
 
     expect(await repository.findById(product.id)).toBeNull();
   });
+
+  describe('search', () => {
+    it('filters in SQL and pages newest first', async () => {
+      const otherVendorId = (await seedTestUser(db, 'seller')).id;
+      const saved = [];
+      for (const overrides of [
+        {
+          name: 'Pulse Oximeter',
+          price: Money.fromCents(150_000),
+          category: 'Diagnostic Devices' as const,
+        },
+        { name: 'N95 Masks', price: Money.fromCents(50_000), category: 'PPE & Masks' as const },
+        { name: 'Empty shelf', stockQuantity: 0 },
+        { name: 'Theirs', vendorId: VendorId.fromString(otherVendorId) },
+      ]) {
+        const product = makeProduct(overrides);
+        await repository.save(product);
+        saved.push(product);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      const names = async (criteria: Parameters<typeof repository.search>[0]) =>
+        (await repository.search(criteria, { limit: 50, offset: 0 })).items.map((p) => p.name);
+
+      expect(await names({})).toEqual(['Theirs', 'Empty shelf', 'N95 Masks', 'Pulse Oximeter']);
+      expect(await names({ vendorId: VendorId.fromString(otherVendorId) })).toEqual(['Theirs']);
+      expect(await names({ text: 'oXiMeTeR' })).toEqual(['Pulse Oximeter']);
+      expect(await names({ categories: ['PPE & Masks'] })).toEqual(['N95 Masks']);
+      expect(await names({ minPriceCents: 100_000 })).toEqual(['Pulse Oximeter']);
+      expect(await names({ inStockOnly: true })).not.toContain('Empty shelf');
+
+      const page = await repository.search({}, { limit: 2, offset: 2 });
+      expect(page.total).toBe(4);
+      expect(page.items.map((p) => p.name)).toEqual(['N95 Masks', 'Pulse Oximeter']);
+    });
+
+    it('treats LIKE wildcards in search text literally', async () => {
+      await repository.save(makeProduct({ name: '100% cotton mask' }));
+      await repository.save(makeProduct({ name: 'Plain mask' }));
+
+      const matches = await repository.search({ text: '%' }, { limit: 10, offset: 0 });
+      expect(matches.items.map((p) => p.name)).toEqual(['100% cotton mask']);
+      expect((await repository.search({ text: '_' }, { limit: 10, offset: 0 })).total).toBe(0);
+    });
+
+    it('lists the categories in use', async () => {
+      await repository.save(makeProduct({ category: 'PPE & Masks' }));
+      await repository.save(makeProduct({ category: 'Diagnostic Devices' }));
+      await repository.save(makeProduct({ category: 'PPE & Masks' }));
+      expect(await repository.categoriesInUse()).toEqual(['Diagnostic Devices', 'PPE & Masks']);
+    });
+  });
 });

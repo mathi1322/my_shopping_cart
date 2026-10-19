@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { container } from '../../../../infrastructure/di/container';
 import { addCartItemSchema } from '../../../../lib/validation/cartSchemas';
-import { toCartDto } from '../../../../application/cart/CartDto';
+import { presentCart } from '../../../../application/cart/CartDto';
 import { jsonResponse } from '../../../../lib/http/jsonResponse';
 import { toErrorResponse } from '../../../../lib/http/errorResponse';
 import { requireUser } from '../../../../lib/http/requireUser';
@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       quantity: input.quantity,
     });
 
-    return jsonResponse(toCartDto(cart), 201);
+    return jsonResponse(await presentCart(cart, container.vendorDirectory), 201);
   } catch (error) {
     return toErrorResponse(error);
   }

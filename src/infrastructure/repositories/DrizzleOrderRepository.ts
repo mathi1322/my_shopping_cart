@@ -1,4 +1,4 @@
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, count, countDistinct, desc, eq, inArray, ne } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { orders, orderItems } from '../db/schema';
 import { Order } from '../../domain/order/Order';
@@ -10,6 +10,7 @@ import { VendorId } from '../../domain/product/VendorId';
 import { Quantity } from '../../domain/cart/Quantity';
 import { Money } from '../../domain/shared/Money';
 import type { OrderRepository } from '../../domain/order/OrderRepository';
+import type { Page, PageRequest } from '../../domain/shared/Pagination';
 
 type OrderRow = typeof orders.$inferSelect;
 type OrderItemRow = typeof orderItems.$inferSelect;
@@ -22,6 +23,7 @@ function itemToDomain(row: OrderItemRow): OrderItem {
     vendorId: VendorId.fromString(row.vendorId),
     unitPrice: Money.fromCents(row.unitPriceInCents, row.currency),
     quantity: Quantity.of(row.quantity),
+    fulfillmentStatus: row.fulfillmentStatus,
   });
 }
 
@@ -61,6 +63,7 @@ export class DrizzleOrderRepository implements OrderRepository {
             unitPriceInCents: item.unitPrice.cents,
             currency: item.unitPrice.currencyCode,
             quantity: item.quantity.value,
+            fulfillmentStatus: item.fulfillmentStatus,
           })),
         );
       }
@@ -82,35 +85,81 @@ export class DrizzleOrderRepository implements OrderRepository {
     return row ? this.hydrate(row) : null;
   }
 
-  async findByBuyerId(buyerId: string): Promise<Order[]> {
-    const rows = await this.db
-      .select()
-      .from(orders)
-      .where(eq(orders.buyerId, buyerId))
-      .orderBy(desc(orders.createdAt));
-    return this.hydrateMany(rows);
+  async findPageByBuyerId(buyerId: string, page: PageRequest): Promise<Page<Order>> {
+    const where = eq(orders.buyerId, buyerId);
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(orders)
+        .where(where)
+        .orderBy(desc(orders.createdAt), desc(orders.id))
+        .limit(page.limit)
+        .offset(page.offset),
+      this.db.select({ total: count() }).from(orders).where(where),
+    ]);
+    return { items: await this.hydrateMany(rows), total };
   }
 
-  async findByVendorId(vendorId: VendorId): Promise<Order[]> {
-    const matchingOrderIds = await this.db
+  async findPageByVendorId(vendorId: VendorId, page: PageRequest): Promise<Page<Order>> {
+    const where = inArray(orders.id, this.orderIdsForVendor(vendorId));
+    const [rows, [{ total }]] = await Promise.all([
+      this.db
+        .select()
+        .from(orders)
+        .where(where)
+        .orderBy(desc(orders.createdAt), desc(orders.id))
+        .limit(page.limit)
+        .offset(page.offset),
+      this.db.select({ total: count() }).from(orders).where(where),
+    ]);
+    return { items: await this.hydrateMany(rows), total };
+  }
+
+  async countAwaitingShipment(vendorId: VendorId): Promise<number> {
+    const [{ total }] = await this.db
+      .select({ total: countDistinct(orderItems.orderId) })
+      .from(orderItems)
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .where(
+        and(
+          eq(orderItems.vendorId, vendorId.toString()),
+          eq(orderItems.fulfillmentStatus, 'placed'),
+          ne(orders.status, 'cancelled'),
+        ),
+      );
+    return total;
+  }
+
+  async hasDeliveredItem(buyerId: string, productId: ProductId): Promise<boolean> {
+    const rows = await this.db
+      .select({ orderId: orderItems.orderId })
+      .from(orderItems)
+      .innerJoin(orders, eq(orders.id, orderItems.orderId))
+      .where(
+        and(
+          eq(orders.buyerId, buyerId),
+          ne(orders.status, 'cancelled'),
+          eq(orderItems.productId, productId.toString()),
+          eq(orderItems.fulfillmentStatus, 'delivered'),
+        ),
+      )
+      .limit(1);
+    return rows.length > 0;
+  }
+
+  private orderIdsForVendor(vendorId: VendorId) {
+    return this.db
       .selectDistinct({ orderId: orderItems.orderId })
       .from(orderItems)
       .where(eq(orderItems.vendorId, vendorId.toString()));
+  }
 
-    if (matchingOrderIds.length === 0) {
-      return [];
-    }
-
+  async findByVendorId(vendorId: VendorId): Promise<Order[]> {
     const rows = await this.db
       .select()
       .from(orders)
-      .where(
-        inArray(
-          orders.id,
-          matchingOrderIds.map((row) => row.orderId),
-        ),
-      )
-      .orderBy(desc(orders.createdAt));
+      .where(inArray(orders.id, this.orderIdsForVendor(vendorId)))
+      .orderBy(desc(orders.createdAt), desc(orders.id));
     return this.hydrateMany(rows);
   }
 

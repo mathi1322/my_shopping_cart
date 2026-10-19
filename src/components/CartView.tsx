@@ -7,6 +7,7 @@ interface CartItem {
   productName: string;
   productImage: string | null;
   vendorId: string;
+  vendorName: string;
   unitPriceInCents: number;
   quantity: number;
   subtotalInCents: number;
@@ -181,8 +182,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
               <li key={item.productId} class="flex gap-4 p-4">
                 <a
                   href={`/products/${item.productId}`}
-                  class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded text-xl font-bold text-slate-500/70 sm:h-20 sm:w-20"
-                  style={item.productImage ? undefined : { background: tile.background }}
+                  class={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded text-xl font-bold text-slate-500/70 sm:h-20 sm:w-20 ${item.productImage ? '' : tile.className}`}
                 >
                   {item.productImage ? (
                     <img src={item.productImage} alt="" class="h-full w-full object-cover" />
@@ -199,7 +199,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                     >
                       {item.productName}
                     </a>
-                    <p class="text-xs text-slate-500">Seller: {item.vendorId}</p>
+                    <p class="text-xs text-slate-500">Sold by {item.vendorName}</p>
                     <p class="mt-1 text-base font-bold text-slate-900">
                       {formatMoney(item.unitPriceInCents, cart.currency)}
                     </p>

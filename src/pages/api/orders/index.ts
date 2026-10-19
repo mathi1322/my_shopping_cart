@@ -4,14 +4,16 @@ import { placeOrderSchema } from '../../../lib/validation/orderSchemas';
 import { jsonResponse } from '../../../lib/http/jsonResponse';
 import { toErrorResponse } from '../../../lib/http/errorResponse';
 import { requireUser } from '../../../lib/http/requireUser';
+import { pageQueryFrom } from '../../../lib/validation/paginationSchemas';
 
 export const prerender = false;
 
-export const GET: APIRoute = async ({ locals }) => {
+export const GET: APIRoute = async ({ locals, url }) => {
   try {
     const requestingUser = requireUser(locals.user);
-    const orders = await container.listOrdersForBuyer.execute(requestingUser.id);
-    return jsonResponse({ orders });
+    return jsonResponse(
+      await container.listOrdersForBuyer.execute(requestingUser.id, pageQueryFrom(url)),
+    );
   } catch (error) {
     return toErrorResponse(error);
   }

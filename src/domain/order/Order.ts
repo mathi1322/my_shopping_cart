@@ -2,10 +2,26 @@ import { AggregateRoot } from '../shared/AggregateRoot';
 import { Money } from '../shared/Money';
 import { ValidationError, ForbiddenError, ConflictError } from '../shared/DomainError';
 import { OrderId } from './OrderId';
-import type { OrderItem } from './OrderItem';
-import { OrderPlaced, OrderCancelled } from './OrderEvents';
+import { FULFILLMENT_STEPS, type FulfillmentStatus, type OrderItem } from './OrderItem';
+import { OrderPlaced, OrderCancelled, OrderFulfillmentAdvanced } from './OrderEvents';
+import type { VendorId } from '../product/VendorId';
 
-export type OrderStatus = 'placed' | 'cancelled';
+/**
+ * `placed`: nothing shipped yet · `shipped`: at least one item is on its way ·
+ * `delivered`: every item has arrived · `cancelled`: cancelled by the buyer.
+ */
+export type OrderStatus = 'placed' | 'shipped' | 'delivered' | 'cancelled';
+
+/** Summarises a set of items: all delivered → delivered; any shipped/delivered → shipped. */
+export function statusOfItems(items: readonly OrderItem[]): Exclude<OrderStatus, 'cancelled'> {
+  if (items.length > 0 && items.every((item) => item.fulfillmentStatus === 'delivered')) {
+    return 'delivered';
+  }
+  if (items.some((item) => item.fulfillmentStatus !== 'placed')) {
+    return 'shipped';
+  }
+  return 'placed';
+}
 export type PaymentMethod = 'cod';
 
 export interface OrderProps {
@@ -70,12 +86,53 @@ export class Order extends AggregateRoot {
     if (this.props.buyerId !== requestingUserId) {
       throw new ForbiddenError('You do not own this order');
     }
-    if (this.props.status === 'cancelled') {
+    if (this.status === 'cancelled') {
       throw new ConflictError('This order has already been cancelled');
+    }
+    if (this.status !== 'placed') {
+      throw new ConflictError('This order has already shipped and can no longer be cancelled');
     }
     this.props.status = 'cancelled';
     this.props.updatedAt = new Date();
     this.addDomainEvent(new OrderCancelled(this.id));
+  }
+
+  /**
+   * Moves one seller's items a single step forward (placed → shipped → delivered).
+   * Other sellers' items in the same order are untouched.
+   */
+  advanceFulfillment(vendorId: VendorId, next: Exclude<FulfillmentStatus, 'placed'>): void {
+    const own = this.props.items.filter((item) => item.vendorId.equals(vendorId));
+    if (own.length === 0) {
+      throw new ForbiddenError('This order has no items from you');
+    }
+    if (this.status === 'cancelled') {
+      throw new ConflictError('This order was cancelled');
+    }
+
+    const current = statusOfItems(own);
+    const expected = FULFILLMENT_STEPS[FULFILLMENT_STEPS.indexOf(current) + 1];
+    if (next !== expected) {
+      throw new ConflictError(
+        current === 'delivered'
+          ? 'These items have already been delivered'
+          : `These items are ${current}; the next step is "${expected}"`,
+      );
+    }
+
+    this.props.items = this.props.items.map((item) =>
+      item.vendorId.equals(vendorId) ? item.withFulfillmentStatus(next) : item,
+    );
+    this.props.updatedAt = new Date();
+    this.addDomainEvent(new OrderFulfillmentAdvanced(this.id, vendorId, next));
+  }
+
+  /** Status of just one seller's items — what that seller sees and acts on. */
+  statusFor(vendorId: VendorId): OrderStatus {
+    if (this.props.status === 'cancelled') {
+      return 'cancelled';
+    }
+    return statusOfItems(this.props.items.filter((item) => item.vendorId.equals(vendorId)));
   }
 
   get id(): OrderId {
@@ -107,7 +164,7 @@ export class Order extends AggregateRoot {
   }
 
   get status(): OrderStatus {
-    return this.props.status;
+    return this.props.status === 'cancelled' ? 'cancelled' : statusOfItems(this.props.items);
   }
 
   get createdAt(): Date {

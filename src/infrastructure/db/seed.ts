@@ -8,6 +8,7 @@ import { ConsoleDomainEventPublisher } from '../../application/shared/DomainEven
 import { CreateProductUseCase } from '../../application/product/CreateProductUseCase';
 import type { CreateProductInput } from '../../application/product/CreateProductUseCase';
 import { RegisterUserUseCase } from '../../application/identity/RegisterUserUseCase';
+import { UpdateUserProfileUseCase } from '../../application/identity/UpdateUserProfileUseCase';
 
 interface DemoReview {
   authorName: string;
@@ -17,10 +18,10 @@ interface DemoReview {
 
 const DEMO_PASSWORD = 'password123';
 
-const demoSellerEmails = [
-  'seller1@medikart.test',
-  'seller2@medikart.test',
-  'seller3@medikart.test',
+const demoSellers = [
+  { email: 'seller1@medikart.test', companyName: 'CareWell Medical Supplies' },
+  { email: 'seller2@medikart.test', companyName: 'HealthFirst Devices' },
+  { email: 'seller3@medikart.test', companyName: 'SafeGuard PPE Co.' },
 ];
 const demoBuyerEmail = 'buyer@medikart.test';
 
@@ -192,12 +193,14 @@ async function main(): Promise<void> {
   }
 
   const registerUser = new RegisterUserUseCase(userRepository, passwordHasher, eventPublisher);
+  const updateProfile = new UpdateUserProfileUseCase(userRepository, eventPublisher);
 
   console.log(`Registering demo accounts (password for all: "${DEMO_PASSWORD}")...`);
   const sellers = [];
-  for (const email of demoSellerEmails) {
+  for (const { email, companyName } of demoSellers) {
     const user = await registerUser.execute({ email, password: DEMO_PASSWORD, role: 'seller' });
-    console.log(`  seller  ${user.email}`);
+    await updateProfile.execute(user.id, { companyName });
+    console.log(`  seller  ${user.email} (${companyName})`);
     sellers.push(user);
   }
   const buyer = await registerUser.execute({

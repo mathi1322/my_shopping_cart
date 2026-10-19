@@ -3,7 +3,8 @@ import { CreateProductUseCase } from '@/application/product/CreateProductUseCase
 import { UpdateProductUseCase } from '@/application/product/UpdateProductUseCase';
 import { DeleteProductUseCase } from '@/application/product/DeleteProductUseCase';
 import { GetProductUseCase } from '@/application/product/GetProductUseCase';
-import { ListProductsUseCase } from '@/application/product/ListProductsUseCase';
+import { SearchProductsUseCase } from '@/application/product/SearchProductsUseCase';
+import { InMemoryVendorDirectory } from '../_fakes/InMemoryVendorDirectory';
 import { ValidationError, NotFoundError, ForbiddenError } from '@/domain/shared/DomainError';
 import { InMemoryProductRepository } from '../_fakes/InMemoryProductRepository';
 import { RecordingEventPublisher } from '../_fakes/RecordingEventPublisher';
@@ -138,46 +139,92 @@ describe('Product use cases', () => {
         validInput(),
         seller,
       );
-      const dto = await new GetProductUseCase(repository).execute(created.id);
+      const dto = await new GetProductUseCase(repository, new InMemoryVendorDirectory()).execute(
+        created.id,
+      );
       expect(dto.id).toBe(created.id);
     });
 
     it('throws NotFoundError for an unknown product', async () => {
-      await expect(new GetProductUseCase(repository).execute('missing-id')).rejects.toThrow(
-        NotFoundError,
-      );
+      await expect(
+        new GetProductUseCase(repository, new InMemoryVendorDirectory()).execute('missing-id'),
+      ).rejects.toThrow(NotFoundError);
     });
   });
 
-  describe('ListProductsUseCase', () => {
-    it('returns all products when no filter is given', async () => {
-      await new CreateProductUseCase(repository, events).execute(validInput(), seller);
-      await new CreateProductUseCase(repository, events).execute(
-        { ...validInput(), name: 'Keyboard' },
-        otherSeller,
-      );
+  describe('SearchProductsUseCase', () => {
+    let vendors: InMemoryVendorDirectory;
+    let search: SearchProductsUseCase;
 
-      const products = await new ListProductsUseCase(repository).execute();
-      expect(products).toHaveLength(2);
+    beforeEach(() => {
+      vendors = new InMemoryVendorDirectory();
+      search = new SearchProductsUseCase(repository, vendors);
     });
 
-    it('filters by vendorId when given', async () => {
-      await new CreateProductUseCase(repository, events).execute(validInput(), seller);
-      await new CreateProductUseCase(repository, events).execute(
-        { ...validInput(), name: 'Keyboard' },
-        otherSeller,
+    async function create(overrides: Record<string, unknown>, owner = seller) {
+      return new CreateProductUseCase(repository, events).execute(
+        { ...validInput(), ...overrides },
+        owner,
       );
+    }
 
-      const products = await new ListProductsUseCase(repository).execute({
-        vendorId: seller.id,
+    it('returns products newest first with the seller display name', async () => {
+      vendors.set(seller.id, 'CareWell Medical');
+      await create({ name: 'Older' });
+      await new Promise((resolve) => setTimeout(resolve, 2));
+      await create({ name: 'Newer' }, otherSeller);
+
+      const result = await search.execute();
+      expect(result.products.map((p) => p.name)).toEqual(['Newer', 'Older']);
+      expect(result.products[1].vendorName).toBe('CareWell Medical');
+      // A seller with no profile name falls back to a neutral label, never their id.
+      expect(result.products[0].vendorName).toBe('MediKart seller');
+      expect(result).toMatchObject({ total: 2, page: 1, totalPages: 1 });
+    });
+
+    it('filters by vendor, text, category, price and stock', async () => {
+      await create({
+        name: 'Pulse Oximeter',
+        priceInCents: 150_000,
+        category: 'Diagnostic Devices',
       });
-      expect(products).toHaveLength(1);
-      expect(products[0].vendorId).toBe(seller.id);
+      await create({ name: 'N95 Masks', priceInCents: 50_000, category: 'PPE & Masks' });
+      await create({ name: 'Out of stock thing', stockQuantity: 0 });
+      await create({ name: 'Theirs', priceInCents: 50_000 }, otherSeller);
+
+      const names = async (query: Parameters<typeof search.execute>[0]) =>
+        (await search.execute(query)).products.map((p) => p.name).sort();
+
+      expect(await names({ vendorId: otherSeller.id })).toEqual(['Theirs']);
+      expect(await names({ text: 'OXIM' })).toEqual(['Pulse Oximeter']);
+      expect(await names({ categories: ['PPE & Masks'] })).toEqual(['N95 Masks']);
+      expect(await names({ minPriceCents: 100_000 })).toEqual(['Pulse Oximeter']);
+      expect(
+        await names({ minPriceCents: 40_000, maxPriceCents: 60_000, vendorId: seller.id }),
+      ).toEqual(['N95 Masks']);
+      expect(await names({ inStockOnly: true, vendorId: seller.id })).not.toContain(
+        'Out of stock thing',
+      );
     });
 
-    it('returns an empty list when there are no products', async () => {
-      const products = await new ListProductsUseCase(repository).execute();
-      expect(products).toEqual([]);
+    it('pages results and clamps out-of-range page sizes', async () => {
+      for (let i = 0; i < 5; i += 1) {
+        await create({ name: `Product ${i}` });
+      }
+      const page2 = await search.execute({ page: 2, pageSize: 2 });
+      expect(page2.products).toHaveLength(2);
+      expect(page2).toMatchObject({ total: 5, page: 2, pageSize: 2, totalPages: 3 });
+
+      const clamped = await search.execute({ page: -4, pageSize: 10_000 });
+      expect(clamped).toMatchObject({ page: 1, pageSize: 100 });
+    });
+
+    it('lists the categories in use for the filter sidebar', async () => {
+      await create({ category: 'PPE & Masks' });
+      await create({ category: 'Diagnostic Devices' }, otherSeller);
+
+      expect((await search.execute()).categories).toEqual(['Diagnostic Devices', 'PPE & Masks']);
+      expect((await search.execute({ vendorId: seller.id })).categories).toEqual(['PPE & Masks']);
     });
   });
 });

@@ -77,7 +77,7 @@ function buildTrend(vendorOrders: VendorOrderSlice[], windowDays: number): Daily
   for (const { order, items } of vendorOrders) {
     const bucket = buckets.get(dateKey(order.createdAt));
     if (!bucket) continue; // outside the trend window
-    if (order.status === 'placed') {
+    if (order.status !== 'cancelled') {
       bucket.placedCount += 1;
       bucket.revenueInCents += revenueOf(items);
     } else {
@@ -111,7 +111,8 @@ export class GetSellerDashboardUseCase {
       items: order.items.filter((item) => item.vendorId.equals(vendorIdVo)),
     }));
 
-    const placed = vendorOrders.filter(({ order }) => order.status === 'placed');
+    // Every order that wasn't cancelled counts as a sale, whatever its delivery stage.
+    const placed = vendorOrders.filter(({ order }) => order.status !== 'cancelled');
     const cancelled = vendorOrders.filter(({ order }) => order.status === 'cancelled');
 
     const currency = vendorOrders[0]?.items[0]?.unitPrice.currencyCode ?? 'INR';
@@ -159,7 +160,7 @@ export class GetSellerDashboardUseCase {
         id: order.id.toString(),
         buyerEmail: order.buyerEmail,
         createdAt: order.createdAt.toISOString(),
-        status: order.status,
+        status: order.statusFor(vendorIdVo),
         itemCount: unitsOf(items),
         totalInCents: revenueOf(items),
       }));

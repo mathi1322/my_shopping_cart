@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from 'drizzle-orm/pg-core';
 import {
@@ -21,7 +22,8 @@ export const productCategory = pgEnum('product_category', [
   FALLBACK_PRODUCT_CATEGORY,
 ]);
 
-export const orderStatus = pgEnum('order_status', ['placed', 'cancelled']);
+export const orderStatus = pgEnum('order_status', ['placed', 'cancelled', 'shipped', 'delivered']);
+export const fulfillmentStatus = pgEnum('fulfillment_status', ['placed', 'shipped', 'delivered']);
 export const paymentMethod = pgEnum('payment_method', ['cod']);
 
 export const users = pgTable('users', {
@@ -72,19 +74,33 @@ export const products = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('products_vendor_id_idx').on(table.vendorId)],
+  (table) => [
+    index('products_vendor_id_idx').on(table.vendorId),
+    // Catalog pages are ordered newest first.
+    index('products_created_at_idx').on(table.createdAt),
+  ],
 );
 
-export const reviews = pgTable('reviews', {
-  id: text('id').primaryKey(),
-  productId: text('product_id')
-    .notNull()
-    .references(() => products.id, { onDelete: 'cascade' }),
-  authorName: varchar('author_name', { length: 120 }).notNull(),
-  rating: integer('rating').notNull(),
-  comment: text('comment').notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const reviews = pgTable(
+  'reviews',
+  {
+    id: text('id').primaryKey(),
+    productId: text('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    // Null for seeded/demo reviews; set for reviews written by a buyer in the app.
+    authorId: text('author_id').references(() => users.id, { onDelete: 'set null' }),
+    authorName: varchar('author_name', { length: 120 }).notNull(),
+    rating: integer('rating').notNull(),
+    comment: text('comment').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // One review per buyer per product (NULL author_ids don't collide).
+    uniqueIndex('reviews_product_id_author_id_unique').on(table.productId, table.authorId),
+    index('reviews_product_id_created_at_idx').on(table.productId, table.createdAt),
+  ],
+);
 
 export const carts = pgTable('carts', {
   id: text('id').primaryKey(),
@@ -148,9 +164,11 @@ export const orderItems = pgTable(
     unitPriceInCents: integer('unit_price_in_cents').notNull(),
     currency: varchar('currency', { length: 3 }).notNull().default('INR'),
     quantity: integer('quantity').notNull(),
+    fulfillmentStatus: fulfillmentStatus('fulfillment_status').notNull().default('placed'),
   },
   (table) => [
     primaryKey({ columns: [table.orderId, table.productId] }),
     index('order_items_vendor_id_idx').on(table.vendorId),
+    index('order_items_product_id_idx').on(table.productId),
   ],
 );

@@ -1,0 +1,76 @@
+---
+interface Props {
+  page: number;
+  totalPages: number;
+  total: number;
+  pageSize: number;
+  /** Builds the link for a page number, keeping the current filters. */
+  hrefFor: (page: number) => string;
+  itemLabel?: string;
+}
+
+const { page, totalPages, total, pageSize, hrefFor, itemLabel = 'items' } = Astro.props;
+
+// Current page ± 2, plus the first and last pages, with gaps shown as "…".
+const pages: (number | 'gap')[] = [];
+for (let n = 1; n <= totalPages; n += 1) {
+  if (n === 1 || n === totalPages || Math.abs(n - page) <= 2) {
+    pages.push(n);
+  } else if (pages[pages.length - 1] !== 'gap') {
+    pages.push('gap');
+  }
+}
+
+const first = total === 0 ? 0 : (page - 1) * pageSize + 1;
+const last = Math.min(page * pageSize, total);
+const linkClass =
+  'min-w-9 rounded-full border border-blue-200 bg-white px-3 py-1.5 text-center text-sm font-medium text-slate-700 hover:border-brand hover:text-brand';
+---
+
+{
+  totalPages > 1 && (
+    <nav aria-label="Pagination" class="mt-6 flex flex-col items-center gap-3">
+      <p class="text-sm text-slate-500">
+        Showing {first}–{last} of {total} {itemLabel}
+      </p>
+      <ul class="flex flex-wrap items-center justify-center gap-2">
+        {page > 1 && (
+          <li>
+            <a href={hrefFor(page - 1)} class={linkClass} rel="prev">
+              ← Previous
+            </a>
+          </li>
+        )}
+        {pages.map((n) =>
+          n === 'gap' ? (
+            <li class="px-1 text-slate-500" aria-hidden="true">
+              …
+            </li>
+          ) : n === page ? (
+            <li>
+              <span
+                aria-current="page"
+                class="bg-brand border-brand inline-block min-w-9 rounded-full border px-3 py-1.5 text-center text-sm font-semibold text-white"
+              >
+                {n}
+              </span>
+            </li>
+          ) : (
+            <li>
+              <a href={hrefFor(n)} class={linkClass} aria-label={`Page ${n}`}>
+                {n}
+              </a>
+            </li>
+          ),
+        )}
+        {page < totalPages && (
+          <li>
+            <a href={hrefFor(page + 1)} class={linkClass} rel="next">
+              Next →
+            </a>
+          </li>
+        )}
+      </ul>
+    </nav>
+  )
+}
