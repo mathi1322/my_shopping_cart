@@ -19,7 +19,7 @@ services:
 
   migrate:
     build: .
-    command: ['npm', 'run', 'db:migrate']
+    command: ['node', 'dist/scripts/migrate.mjs']
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shopping_cart}
     depends_on:
@@ -28,7 +28,7 @@ services:
 
   seed:
     build: .
-    command: ['npm', 'run', 'db:seed']
+    command: ['node', 'dist/scripts/seed.mjs']
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shopping_cart}
     depends_on:
@@ -36,7 +36,10 @@ services:
         condition: service_completed_successfully
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-shopping_cart}

@@ -26,7 +26,7 @@ Dependencies point inward only: `domain` knows nothing about `application`, `inf
 
 - **Identity** (`domain/identity`) — `User` (email, password hash, role: buyer or seller, profile fields: name/phone/address, and seller-only company name/company address/GST number). Owns authentication; product ownership and authorization live in the Product context instead (see below), because "can this seller edit this product" is a Product business rule, not an Identity one.
 - **Product** (`domain/product`) — catalog data: name, description, price, stock, category (a fixed enum, `domain/product/ProductCategory.ts`), and a list of externally-hosted image URLs — plus which vendor (a `User.id`) owns the listing.
-- **Cart** (`domain/cart`) — a cart aggregate holding line items. Product name/price/vendor/image are **snapshotted** into each `CartItem` at add-to-cart time, so a vendor editing a product afterwards doesn't silently change what's already in someone's cart.
+- **Cart** (`domain/cart`) — a cart aggregate holding line items. Product name/price/vendor/image are **snapshotted** into each `CartItem` at add-to-cart time, so a vendor editing a product afterwards doesn't silently change what's already in someone's cart. At checkout the snapshot is compared with the product's current price: if it changed, the order is refused with a 409, the cart is repriced, and the buyer reviews the new total and resubmits — a buyer is never charged a price they haven't seen.
 - **Order** (`domain/order`) — created from a buyer's cart at checkout (`PlaceOrderUseCase`). Snapshots the same per-item fields as `CartItem` (name/price/vendor/image), plus the buyer's email, delivery address/phone, and a `status` of `placed`/`cancelled`. A `VendorId` on each line item is what lets `ListOrdersForVendorUseCase` answer "which orders contain my products" without Order depending on Product.
 - **Review** (`domain/review`) — deliberately not a full aggregate: reviews are read-only, seed/display data today (there's no submit-a-review flow), so there's nothing to protect with invariants or events. It's a plain `Review` shape plus a `ReviewRepository.findByProductId` — the minimum needed to keep the read path behind an interface, without the ceremony of an aggregate root that has no behavior.
 
@@ -35,6 +35,17 @@ These are separate aggregates on purpose: adding to a cart validates against the
 ### Analytics is a read-model, not a bounded context
 
 `GetSellerDashboardUseCase` (`application/analytics`) is the one place the codebase deliberately steps outside per-aggregate repository access: it reads `Order` and `Product` directly and aggregates across them (revenue, top products, category breakdown, a 14-day trend) to build `/sell/dashboard`. It has no domain layer of its own because there's no invariant to protect — a report can't be "invalid" the way an aggregate mutation can. Wiring it as a use case (rather than inline query code in the `.astro` page) keeps it unit-testable with the same in-memory fakes as everything else, which is the only reason it's structured this way rather than as a raw SQL report.
+
+### Transactions & concurrency
+
+Use cases that change more than one aggregate atomically — `PlaceOrderUseCase` (stock + cart + order) and `CancelOrderUseCase` (order + stock) — run inside a `UnitOfWork` (`application/shared/UnitOfWork.ts`, implemented by `infrastructure/db/DrizzleUnitOfWork.ts` as one Postgres transaction). Either every write commits or none does, so a failure can never leave stock decremented without an order.
+
+Concurrency is handled with row locks taken through `find…ForUpdate` repository methods, rather than with a higher isolation level plus retries:
+
+- Checkout locks the buyer's cart first (a double-submitted checkout waits, then finds the cart empty), then locks each product in id order (so two checkouts sharing products can't deadlock), and decrements stock with a conditional `UPDATE … WHERE stock_quantity >= n` as a last line of defence against overselling.
+- Cancel locks the order row, so a concurrent second cancel waits, then fails the already-cancelled check — stock is only ever restored once.
+
+Stock changes at checkout/cancel are direct `decrementStock`/`incrementStock` updates rather than load-mutate-save of the `Product` aggregate, so they don't raise `ProductUpdated`. These behaviours are covered by concurrent-request tests in `tests/integration/api/orders.test.ts`.
 
 ### Domain events
 
@@ -45,6 +56,8 @@ Aggregates (`Product`, `Cart`, `Order`, `User`) record domain events (`ProductCr
 **Sessions, not JWTs.** Login/register issue an opaque random token (`node:crypto` `randomBytes(32)`) stored in a `sessions` table (`user_id`, `expires_at`) and set as an httpOnly cookie. This was chosen over a signed JWT because it needs no `SESSION_SECRET` to manage, and — unlike a self-contained JWT — a session can be revoked server-side (logout actually invalidates it, rather than just deleting a cookie the client could resend). The cost is a DB lookup per request, which is irrelevant at this scale.
 
 **Password hashing** uses Node's built-in `scrypt` (`infrastructure/auth/ScryptPasswordHasher.ts`) via a domain-owned `PasswordHasher` interface (`domain/identity/PasswordHasher.ts`) — same pattern as a repository: the domain declares the port, infrastructure implements it. No bcrypt/argon2 dependency needed for a project this size.
+
+**Hardening.** The session cookie is `Secure` in production builds (override with `COOKIE_SECURE`). Login is rate-limited per client+email and per client, and registration per client (`lib/http/rateLimit.ts`, answering 429 with `Retry-After`); the limiter is in-process memory, which fits this single-process deployment and would need a shared store if the app is scaled out. An unknown email still runs the password KDF, so login timing doesn't reveal which accounts exist. Expired sessions are purged whenever a new session is created. The middleware also sets baseline security headers (`X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`).
 
 **Where authorization checks live**, split by what kind of question they answer:
 
@@ -65,7 +78,7 @@ The cart belongs to a user account: `carts.user_id` is a unique, non-null foreig
 
 ## A note on CSRF
 
-Astro's default `security.checkOrigin` rejects state-changing requests (POST/PUT/DELETE) whose `Origin` header doesn't match the request host. This is left **enabled** rather than disabled: cart and session identity both ride on cookies, so an attacker's page could otherwise trigger mutations in a victim's session purely via a cross-site form/fetch. Same-origin browser requests (the app's own UI) satisfy this automatically; API clients like curl/Postman need to pass a matching `Origin` header (documented in the README).
+Astro's default `security.checkOrigin` rejects state-changing requests (POST/PUT/DELETE) whose `Origin` header doesn't match the request host. This is left **enabled** rather than disabled: cart and session identity both ride on cookies, so an attacker's page could otherwise trigger mutations in a victim's session purely via a cross-site form/fetch. Same-origin browser requests (the app's own UI) satisfy this automatically; API clients like curl/Postman need to pass a matching `Origin` header (documented in the README). As a second layer, `src/middleware.ts` rejects any state-changing `/api/*` request whose body isn't `application/json` (415), so a cross-site form or `text/plain` post can't reach a handler even from a client that omits `Origin`.
 
 ## Extension points (deliberately not built)
 

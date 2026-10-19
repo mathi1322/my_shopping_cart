@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   jsonb,
   pgEnum,
@@ -37,31 +38,42 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const sessions = pgTable('sessions', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const sessions = pgTable(
+  'sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('sessions_user_id_idx').on(table.userId),
+    index('sessions_expires_at_idx').on(table.expiresAt),
+  ],
+);
 
-export const products = pgTable('products', {
-  id: text('id').primaryKey(),
-  vendorId: text('vendor_id')
-    .notNull()
-    .references(() => users.id),
-  name: varchar('name', { length: 200 }).notNull(),
-  description: text('description').notNull(),
-  priceInCents: integer('price_in_cents').notNull(),
-  currency: varchar('currency', { length: 3 }).notNull().default('INR'),
-  stockQuantity: integer('stock_quantity').notNull(),
-  category: productCategory('category').notNull().default(FALLBACK_PRODUCT_CATEGORY),
-  features: jsonb('features').$type<string[]>().notNull().default([]),
-  images: jsonb('images').$type<string[]>().notNull().default([]),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const products = pgTable(
+  'products',
+  {
+    id: text('id').primaryKey(),
+    vendorId: text('vendor_id')
+      .notNull()
+      .references(() => users.id),
+    name: varchar('name', { length: 200 }).notNull(),
+    description: text('description').notNull(),
+    priceInCents: integer('price_in_cents').notNull(),
+    currency: varchar('currency', { length: 3 }).notNull().default('INR'),
+    stockQuantity: integer('stock_quantity').notNull(),
+    category: productCategory('category').notNull().default(FALLBACK_PRODUCT_CATEGORY),
+    features: jsonb('features').$type<string[]>().notNull().default([]),
+    images: jsonb('images').$type<string[]>().notNull().default([]),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('products_vendor_id_idx').on(table.vendorId)],
+);
 
 export const reviews = pgTable('reviews', {
   id: text('id').primaryKey(),
@@ -103,19 +115,23 @@ export const cartItems = pgTable(
   (table) => [primaryKey({ columns: [table.cartId, table.productId] })],
 );
 
-export const orders = pgTable('orders', {
-  id: text('id').primaryKey(),
-  buyerId: text('buyer_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  buyerEmail: text('buyer_email').notNull(),
-  deliveryAddress: text('delivery_address').notNull(),
-  deliveryPhone: varchar('delivery_phone', { length: 20 }).notNull(),
-  paymentMethod: paymentMethod('payment_method').notNull().default('cod'),
-  status: orderStatus('status').notNull().default('placed'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const orders = pgTable(
+  'orders',
+  {
+    id: text('id').primaryKey(),
+    buyerId: text('buyer_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    buyerEmail: text('buyer_email').notNull(),
+    deliveryAddress: text('delivery_address').notNull(),
+    deliveryPhone: varchar('delivery_phone', { length: 20 }).notNull(),
+    paymentMethod: paymentMethod('payment_method').notNull().default('cod'),
+    status: orderStatus('status').notNull().default('placed'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index('orders_buyer_id_created_at_idx').on(table.buyerId, table.createdAt)],
+);
 
 export const orderItems = pgTable(
   'order_items',
@@ -133,5 +149,8 @@ export const orderItems = pgTable(
     currency: varchar('currency', { length: 3 }).notNull().default('INR'),
     quantity: integer('quantity').notNull(),
   },
-  (table) => [primaryKey({ columns: [table.orderId, table.productId] })],
+  (table) => [
+    primaryKey({ columns: [table.orderId, table.productId] }),
+    index('order_items_vendor_id_idx').on(table.vendorId),
+  ],
 );

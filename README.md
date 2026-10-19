@@ -71,6 +71,10 @@ To customize ports/credentials, copy `.env.example` to `.env` first — `docker-
 
 Stop everything with `docker compose down` (add `-v` to also drop the Postgres volume and its data).
 
+### Deploying beyond localhost
+
+Set `ALLOWED_HOSTS` (comma-separated public hostnames, e.g. `ALLOWED_HOSTS=shop.example.com`) when building the image. Astro only trusts the `Host`/`X-Forwarded-*` headers for allowed hosts; without it, same-origin checks reject logout and order cancellation and every visitor shares one rate-limit bucket. Serve the app over HTTPS (the session cookie is `Secure` in production) behind a reverse proxy that overwrites `X-Forwarded-For`, and don't expose the app port directly. See `.env.example` for `COOKIE_SECURE`.
+
 ## Local development (without Docker)
 
 Requires Node.js 22+ and a running Postgres instance.
@@ -94,16 +98,18 @@ npm run test:integration  # integration tests — real Postgres required (DATABA
 Integration tests exercise the actual Drizzle repositories and the actual Astro API route handlers against a real database — nothing is mocked at that layer. Point `DATABASE_URL` at a disposable database before running them, e.g.:
 
 ```sh
-docker run -d --name shopping_cart_test_db -e POSTGRES_PASSWORD=postgres -p 5433:5432 postgres:16-alpine
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres npm run db:migrate
-DATABASE_URL=postgres://postgres:postgres@localhost:5433/postgres npm run test:integration
+docker run -d --name shopping_cart_test_db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=shopping_cart_test -p 5433:5432 postgres:16-alpine
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/shopping_cart_test npm run db:migrate
+DATABASE_URL=postgres://postgres:postgres@localhost:5433/shopping_cart_test npm run test:integration
 ```
 
-**Note:** the integration suite truncates every table before each test file runs (`tests/integration/setupDb.ts`) — always point it at a disposable database, never at your development or seeded one.
+**Note:** the integration suite truncates every table before each test file runs (`tests/integration/setupDb.ts`), so it refuses to run unless the database name contains `test`. Always point it at a disposable database, never at your development or seeded one.
+
+CI (`.github/workflows/ci.yml`) runs formatting, lint, typecheck, unit tests, integration tests against a Postgres service, the production build, and a runtime dependency audit on every push and pull request.
 
 ## API reference
 
-All responses are JSON. Errors use the shape `{ "error": { "code": "...", "message": "...", "details"?: ... } }` with status 400 (validation), 401 (not logged in), 403 (logged in, but wrong role or not the owner), 404 (not found), 409 (conflict, e.g. insufficient stock, cart already empty, order already cancelled), or 500.
+All responses are JSON. Errors use the shape `{ "error": { "code": "...", "message": "...", "details"?: ... } }` with status 400 (validation), 401 (not logged in), 403 (logged in, but wrong role or not the owner), 404 (not found), 409 (conflict, e.g. insufficient stock, cart already empty, order already cancelled, or a price changed since the item was added — the cart is repriced so the buyer can review and resubmit), 429 (too many login/register attempts; see the `Retry-After` header), or 500.
 
 Not everything in the app goes through a JSON API — product reviews and the seller dashboard are read directly by their `.astro` pages via a use case (`container.listReviewsForProduct` / `container.getSellerDashboard`), since only that page ever needs the data and a round-trip through `fetch` would be pure overhead. Only endpoints actually called from client-side code are listed below.
 

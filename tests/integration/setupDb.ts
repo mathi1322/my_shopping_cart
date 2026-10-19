@@ -15,6 +15,14 @@ export function createTestDb() {
   if (!connectionString) {
     throw new Error('DATABASE_URL must be set to run integration tests');
   }
+  // The suite truncates every table, so refuse anything that isn't clearly a throwaway test database.
+  const databaseName = new URL(connectionString).pathname.slice(1);
+  if (!/test/i.test(databaseName)) {
+    throw new Error(
+      `Refusing to run integration tests against "${databaseName}": the suite truncates every table, ` +
+        'so the database name must contain "test" (e.g. shopping_cart_test).',
+    );
+  }
   const client = postgres(connectionString);
   const db = drizzle(client, { schema });
   return { db, client };

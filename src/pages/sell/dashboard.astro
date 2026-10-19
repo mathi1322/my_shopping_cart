@@ -251,7 +251,7 @@ function formatDate(iso: string): string {
                 stroke-linejoin="round"
                 stroke-linecap="round"
               />
-              {points.map((p, i) => (
+              {points.map((p) => (
                 <circle cx={p.x} cy={p.y} r="4" fill="#2a78d6" stroke="#ffffff" stroke-width="2">
                   <title>
                     {p.day.label}: {formatMoney(p.day.revenueInCents)} ({p.day.placedCount} order
