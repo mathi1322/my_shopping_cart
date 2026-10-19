@@ -52,6 +52,7 @@ export class Product extends AggregateRoot {
     Product.assertName(input.name);
     Product.assertDescription(input.description);
     Product.assertStock(input.stockQuantity);
+    Product.assertNewImagesUseHttps(input.images ?? [], []);
 
     const now = new Date();
     const product = new Product({
@@ -96,6 +97,7 @@ export class Product extends AggregateRoot {
       this.props.category = input.category;
     }
     if (input.images !== undefined) {
+      Product.assertNewImagesUseHttps(input.images, this.props.images);
       this.props.images = input.images;
     }
     this.props.updatedAt = new Date();
@@ -164,6 +166,17 @@ export class Product extends AggregateRoot {
       throw new ValidationError(
         `Product description cannot exceed ${MAX_DESCRIPTION_LENGTH} characters`,
       );
+    }
+  }
+
+  /**
+   * Newly added images must be https (no mixed content). Images already on the
+   * product are kept as-is, so a listing with an older http image stays editable.
+   */
+  private static assertNewImagesUseHttps(images: string[], existing: string[]): void {
+    const added = images.filter((url) => !existing.includes(url));
+    if (added.some((url) => !url.startsWith('https://'))) {
+      throw new ValidationError('Image URLs must start with https://');
     }
   }
 

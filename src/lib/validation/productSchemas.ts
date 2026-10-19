@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { PRODUCT_CATEGORIES } from '../../domain/product/ProductCategory';
 
-// https only: rejects javascript:, data:, and plain-http (mixed-content) image URLs.
-const imageUrlSchema = z.url({ protocol: /^https$/, error: 'Image URLs must start with https://' });
+// Web links only — rejects javascript:, data:, etc. The stricter https-only rule for
+// newly added images lives in the Product aggregate, so older http images stay editable.
+const imageUrlSchema = z.url({ protocol: /^https?$/, error: 'Image URLs must be web links' });
 const imagesSchema = z
   .array(z.string().trim().pipe(imageUrlSchema))
   .max(8, 'A product can have at most 8 images');

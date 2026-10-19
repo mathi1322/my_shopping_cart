@@ -8,6 +8,8 @@ import {
 import { createTestDb, truncateAll, seedTestUser } from '../setupDb';
 import { callRoute, jsonRequest } from './_httpTestUtils';
 import type { UserDto } from '@/application/identity/UserDto';
+import { products as productsTable } from '@/infrastructure/db/schema';
+import { eq } from 'drizzle-orm';
 
 const { db } = createTestDb();
 
@@ -256,5 +258,53 @@ describe('Products API', () => {
     });
 
     expect(response.status).toBe(404);
+  });
+
+  it('rejects non-https and non-web image URLs on create', async () => {
+    for (const url of [
+      'http://cdn.example/a.jpg',
+      'javascript:alert(1)',
+      'data:image/png;base64,AA',
+    ]) {
+      const response = await callRoute(createProduct, {
+        request: jsonRequest(
+          'http://localhost/api/products',
+          'POST',
+          validPayload({ images: [url] }),
+        ),
+        user: seller,
+      });
+      expect(response.status, url).toBe(400);
+    }
+  });
+
+  it('still lets a seller edit a listing that has an older http image', async () => {
+    const product = await createTestProduct(seller);
+    // Simulate a listing saved before https was required.
+    await db
+      .update(productsTable)
+      .set({ images: ['http://legacy.example/a.jpg'] })
+      .where(eq(productsTable.id, product.id));
+
+    // The edit form always re-sends the existing images along with the change.
+    const edit = await callRoute(updateProduct, {
+      request: jsonRequest(`http://localhost/api/products/${product.id}`, 'PUT', {
+        stockQuantity: 3,
+        images: ['http://legacy.example/a.jpg'],
+      }),
+      params: { id: product.id },
+      user: seller,
+    });
+    expect(edit.status).toBe(200);
+    expect((await edit.json()).stockQuantity).toBe(3);
+
+    const addHttp = await callRoute(updateProduct, {
+      request: jsonRequest(`http://localhost/api/products/${product.id}`, 'PUT', {
+        images: ['http://legacy.example/a.jpg', 'http://new.example/b.jpg'],
+      }),
+      params: { id: product.id },
+      user: seller,
+    });
+    expect(addHttp.status).toBe(400);
   });
 });
