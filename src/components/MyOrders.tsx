@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { placeholderTile } from '../lib/ui/placeholderTile';
+import { fetchJson } from '../lib/ui/fetchJson';
 
 interface OrderItem {
   productId: string;
@@ -41,10 +42,16 @@ export default function MyOrders() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [justPlaced, setJustPlaced] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   async function loadOrders() {
-    const res = await fetch('/api/orders');
-    const data = await res.json();
-    setOrders(data.orders);
+    const result = await fetchJson<{ orders: OrderDto[] }>('/api/orders');
+    if (!result.ok) {
+      setLoadError(result.message);
+      return;
+    }
+    setLoadError(null);
+    setOrders(result.data.orders);
   }
 
   useEffect(() => {
@@ -57,14 +64,16 @@ export default function MyOrders() {
     setError(null);
     setCancellingId(orderId);
     try {
-      const res = await fetch(`/api/orders/${orderId}/cancel`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? 'Could not cancel this order');
+      const result = await fetchJson<OrderDto>(`/api/orders/${orderId}/cancel`, {
+        method: 'POST',
+      });
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
+      const cancelled = result.data;
       setOrders((current) =>
-        current ? current.map((order) => (order.id === orderId ? data : order)) : current,
+        current ? current.map((order) => (order.id === orderId ? cancelled : order)) : current,
       );
       window.dispatchEvent(new CustomEvent('orders:updated'));
     } finally {
@@ -73,7 +82,13 @@ export default function MyOrders() {
   }
 
   if (!orders) {
-    return <p class="text-slate-500">Loading your orders…</p>;
+    return loadError ? (
+      <p role="alert" class="rounded bg-red-50 px-4 py-2 text-sm text-red-700">
+        Could not load your orders: {loadError}
+      </p>
+    ) : (
+      <p class="text-slate-500">Loading your orders…</p>
+    );
   }
 
   if (orders.length === 0) {
@@ -103,7 +118,7 @@ export default function MyOrders() {
         <div key={order.id} class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
           <div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3">
             <div>
-              <p class="text-xs text-slate-400">Order #{order.id.slice(0, 8)}</p>
+              <p class="text-xs text-slate-500">Order #{order.id.slice(0, 8)}</p>
               <p class="text-sm text-slate-500">Placed on {formatDate(order.createdAt)}</p>
             </div>
             <span
@@ -140,7 +155,7 @@ export default function MyOrders() {
                     >
                       {item.productName}
                     </a>
-                    <p class="text-xs text-slate-400">Qty {item.quantity}</p>
+                    <p class="text-xs text-slate-500">Qty {item.quantity}</p>
                   </div>
                   <p class="shrink-0 self-center text-sm font-semibold text-slate-900">
                     {formatMoney(item.subtotalInCents, order.currency)}

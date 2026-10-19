@@ -101,7 +101,7 @@ export default function AddToCartControl({ productId, stockQuantity, initialLogg
         </div>
         {message && (
           <span
-            class={`text-xs font-medium ${status === 'error' ? 'text-red-500' : 'text-green-600'}`}
+            class={`text-xs font-medium ${status === 'error' ? 'text-red-600' : 'text-green-700'}`}
           >
             {message}
           </span>

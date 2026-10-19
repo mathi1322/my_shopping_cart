@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { AuthUser } from './LoginForm';
 import { placeholderTile } from '../lib/ui/placeholderTile';
+import { fetchJson } from '../lib/ui/fetchJson';
 
 interface Props {
   initialUser: AuthUser | null;
@@ -57,7 +58,7 @@ export default function AuthStatus({ initialUser }: Props) {
   }, [open]);
 
   async function handleLogout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetchJson('/api/auth/logout', { method: 'POST' });
     window.location.assign('/');
   }
 
@@ -108,7 +109,7 @@ export default function AuthStatus({ initialUser }: Props) {
         <div class="absolute right-0 z-20 mt-2 w-60 overflow-hidden rounded-xl border border-blue-200 bg-white py-1 shadow-lg">
           <div class="border-b border-slate-100 px-4 py-3">
             <p class="truncate text-sm font-semibold text-slate-800">{user.email}</p>
-            <p class="text-xs text-slate-400 capitalize">{user.role} account</p>
+            <p class="text-xs text-slate-500 capitalize">{user.role} account</p>
           </div>
           {isSeller && (
             <a

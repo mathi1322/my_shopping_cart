@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { PRODUCT_CATEGORIES } from '../domain/product/ProductCategory';
+import { fetchJson } from '../lib/ui/fetchJson';
 
 interface ProductDto {
   id: string;
@@ -62,6 +63,7 @@ function ImageUrlsField({ images, onChange }: ImageUrlsFieldProps) {
       <div class="flex gap-2">
         <input
           type="url"
+          aria-label="Image URL"
           placeholder="Image URL (https://…)"
           value={urlInput}
           onInput={(e) => setUrlInput((e.target as HTMLInputElement).value)}
@@ -118,9 +120,14 @@ export default function SellerProductManager({ vendorId }: Props) {
   const [savingId, setSavingId] = useState<string | null>(null);
 
   async function loadProducts() {
-    const res = await fetch(`/api/products?vendorId=${encodeURIComponent(vendorId)}`);
-    const data = await res.json();
-    setProducts(data.products);
+    const result = await fetchJson<{ products: ProductDto[] }>(
+      `/api/products?vendorId=${encodeURIComponent(vendorId)}`,
+    );
+    if (!result.ok) {
+      setError(`Could not load your products: ${result.message}`);
+      return;
+    }
+    setProducts(result.data.products);
   }
 
   useEffect(() => {
@@ -132,7 +139,7 @@ export default function SellerProductManager({ vendorId }: Props) {
     setError(null);
     setCreating(true);
     try {
-      const res = await fetch('/api/products', {
+      const result = await fetchJson<ProductDto>('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,9 +151,8 @@ export default function SellerProductManager({ vendorId }: Props) {
           images: newProduct.images,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? 'Could not create product');
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
       setNewProduct(emptyForm);
@@ -172,7 +178,7 @@ export default function SellerProductManager({ vendorId }: Props) {
     setError(null);
     setSavingId(productId);
     try {
-      const res = await fetch(`/api/products/${productId}`, {
+      const result = await fetchJson<ProductDto>(`/api/products/${productId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -184,9 +190,8 @@ export default function SellerProductManager({ vendorId }: Props) {
           images: editDraft.images,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? 'Could not update product');
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
       setEditingId(null);
@@ -201,10 +206,9 @@ export default function SellerProductManager({ vendorId }: Props) {
     setError(null);
     setSavingId(productId);
     try {
-      const res = await fetch(`/api/products/${productId}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
-        setError(data.error?.message ?? 'Could not delete product');
+      const result = await fetchJson<null>(`/api/products/${productId}`, { method: 'DELETE' });
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
       await loadProducts();
@@ -222,6 +226,7 @@ export default function SellerProductManager({ vendorId }: Props) {
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <input
             required
+            aria-label="Product name"
             placeholder="Product name"
             value={newProduct.name}
             onInput={(e) =>
@@ -230,6 +235,7 @@ export default function SellerProductManager({ vendorId }: Props) {
             class="rounded border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
           />
           <textarea
+            aria-label="Description"
             placeholder="Description"
             value={newProduct.description}
             onInput={(e) =>
@@ -246,6 +252,7 @@ export default function SellerProductManager({ vendorId }: Props) {
             type="number"
             step="0.01"
             min="0"
+            aria-label="Price (INR)"
             placeholder="Price (INR)"
             value={newProduct.price}
             onInput={(e) =>
@@ -258,6 +265,7 @@ export default function SellerProductManager({ vendorId }: Props) {
             type="number"
             min="0"
             step="1"
+            aria-label="Stock quantity"
             placeholder="Stock quantity"
             value={newProduct.stock}
             onInput={(e) =>
@@ -266,6 +274,7 @@ export default function SellerProductManager({ vendorId }: Props) {
             class="rounded border border-slate-300 px-3 py-2 text-sm"
           />
           <select
+            aria-label="Category"
             value={newProduct.category}
             onInput={(e) =>
               setNewProduct({ ...newProduct, category: (e.target as HTMLSelectElement).value })
@@ -308,6 +317,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                 <li key={product.id} class="p-4">
                   <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <input
+                      aria-label="Product name"
                       value={editDraft.name}
                       onInput={(e) =>
                         setEditDraft({ ...editDraft, name: (e.target as HTMLInputElement).value })
@@ -315,6 +325,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                       class="rounded border border-slate-300 px-3 py-2 text-sm sm:col-span-2"
                     />
                     <textarea
+                      aria-label="Description"
                       value={editDraft.description}
                       onInput={(e) =>
                         setEditDraft({
@@ -326,6 +337,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                       rows={2}
                     />
                     <input
+                      aria-label="Price (INR)"
                       type="number"
                       step="0.01"
                       min="0"
@@ -336,6 +348,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                       class="rounded border border-slate-300 px-3 py-2 text-sm"
                     />
                     <input
+                      aria-label="Stock quantity"
                       type="number"
                       min="0"
                       step="1"
@@ -346,6 +359,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                       class="rounded border border-slate-300 px-3 py-2 text-sm"
                     />
                     <select
+                      aria-label="Category"
                       value={editDraft.category}
                       onInput={(e) =>
                         setEditDraft({
@@ -396,13 +410,13 @@ export default function SellerProductManager({ vendorId }: Props) {
                       <p class="font-medium text-slate-800">{product.name}</p>
                       <p class="text-sm text-slate-500">
                         {formatMoney(product.priceInCents, product.currency)} ·{' '}
-                        <span class={product.stockQuantity > 0 ? 'text-green-600' : 'text-red-500'}>
+                        <span class={product.stockQuantity > 0 ? 'text-green-700' : 'text-red-600'}>
                           {product.stockQuantity > 0
                             ? `${product.stockQuantity} in stock`
                             : 'Out of stock'}
                         </span>
                       </p>
-                      <p class="text-xs text-slate-400">{product.category}</p>
+                      <p class="text-xs text-slate-500">{product.category}</p>
                     </div>
                   </div>
                   <div class="flex gap-4">
@@ -415,7 +429,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                     <button
                       onClick={() => deleteProduct(product.id)}
                       disabled={savingId === product.id}
-                      class="text-sm font-semibold text-red-500 uppercase hover:underline disabled:opacity-50"
+                      class="text-sm font-semibold text-red-600 uppercase hover:underline disabled:opacity-50"
                     >
                       Delete
                     </button>

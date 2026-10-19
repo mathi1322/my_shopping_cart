@@ -56,7 +56,7 @@ export default function RegisterForm() {
           onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
           class="w-full rounded border border-slate-300 px-3 py-2 text-sm"
         />
-        <span class="mt-1 block text-xs text-slate-400">At least 8 characters</span>
+        <span class="mt-1 block text-xs text-slate-500">At least 8 characters</span>
       </label>
 
       <fieldset class="mb-4">

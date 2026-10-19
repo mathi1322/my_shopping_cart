@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { placeholderTile } from '../lib/ui/placeholderTile';
+import { fetchJson } from '../lib/ui/fetchJson';
 
 interface CartItem {
   productId: string;
@@ -40,10 +41,16 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   async function loadCart() {
-    const res = await fetch('/api/cart');
-    const data = await res.json();
-    setCart(data);
+    const result = await fetchJson<CartData>('/api/cart');
+    if (!result.ok) {
+      setLoadError(result.message);
+      return;
+    }
+    setLoadError(null);
+    setCart(result.data);
   }
 
   useEffect(() => {
@@ -55,17 +62,16 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
     setError(null);
     setPendingProductId(productId);
     try {
-      const res = await fetch(`/api/cart/items/${productId}`, {
+      const result = await fetchJson<CartData>(`/api/cart/items/${productId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ quantity }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? 'Could not update quantity');
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
-      setCart(data);
+      setCart(result.data);
       window.dispatchEvent(new CustomEvent('cart:updated'));
     } finally {
       setPendingProductId(null);
@@ -76,13 +82,14 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
     setError(null);
     setPendingProductId(productId);
     try {
-      const res = await fetch(`/api/cart/items/${productId}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error?.message ?? 'Could not remove item');
+      const result = await fetchJson<CartData>(`/api/cart/items/${productId}`, {
+        method: 'DELETE',
+      });
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
-      setCart(data);
+      setCart(result.data);
       window.dispatchEvent(new CustomEvent('cart:updated'));
     } finally {
       setPendingProductId(null);
@@ -131,7 +138,13 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
   }
 
   if (!cart) {
-    return <p class="text-slate-500">Loading your cart…</p>;
+    return loadError ? (
+      <p role="alert" class="rounded bg-red-50 px-4 py-2 text-sm text-red-700">
+        Could not load your cart: {loadError}
+      </p>
+    ) : (
+      <p class="text-slate-500">Loading your cart…</p>
+    );
   }
 
   if (cart.items.length === 0) {
@@ -186,7 +199,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                     >
                       {item.productName}
                     </a>
-                    <p class="text-xs text-slate-400">Seller: {item.vendorId}</p>
+                    <p class="text-xs text-slate-500">Seller: {item.vendorId}</p>
                     <p class="mt-1 text-base font-bold text-slate-900">
                       {formatMoney(item.unitPriceInCents, cart.currency)}
                     </p>
@@ -245,7 +258,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
         </div>
         <div class="flex justify-between border-b border-dashed border-slate-200 pb-3 text-sm text-slate-600">
           <span>Delivery Charges</span>
-          <span class="font-medium text-green-600">Free</span>
+          <span class="font-medium text-green-700">Free</span>
         </div>
         <div class="flex justify-between py-3 text-base font-bold text-slate-900">
           <span>Total Amount</span>
@@ -258,7 +271,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
         >
           Place Order
         </button>
-        <p class="mt-2 text-center text-xs text-slate-400">Cash on Delivery only, for now.</p>
+        <p class="mt-2 text-center text-xs text-slate-500">Cash on Delivery only, for now.</p>
       </div>
 
       {checkoutStep !== 'closed' && (

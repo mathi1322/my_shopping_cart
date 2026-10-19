@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { placeholderTile } from '../lib/ui/placeholderTile';
+import { fetchJson } from '../lib/ui/fetchJson';
 
 interface OrderItem {
   productId: string;
@@ -36,12 +37,17 @@ function formatDate(iso: string): string {
 
 export default function SellerOrders() {
   const [orders, setOrders] = useState<OrderDto[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
-      const res = await fetch('/api/orders/received');
-      const data = await res.json();
-      setOrders(data.orders);
+      const result = await fetchJson<{ orders: OrderDto[] }>('/api/orders/received');
+      if (!result.ok) {
+        setLoadError(result.message);
+        return;
+      }
+      setLoadError(null);
+      setOrders(result.data.orders);
     }
     load();
     window.addEventListener('orders:updated', load);
@@ -49,7 +55,13 @@ export default function SellerOrders() {
   }, []);
 
   if (!orders) {
-    return <p class="text-slate-500">Loading orders…</p>;
+    return loadError ? (
+      <p role="alert" class="rounded bg-red-50 px-4 py-2 text-sm text-red-700">
+        Could not load orders: {loadError}
+      </p>
+    ) : (
+      <p class="text-slate-500">Loading orders…</p>
+    );
   }
 
   if (orders.length === 0) {
@@ -71,7 +83,7 @@ export default function SellerOrders() {
           <div key={order.id} class="rounded-2xl border border-blue-200 bg-white p-4 sm:p-6">
             <div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-3">
               <div>
-                <p class="text-xs text-slate-400">Order #{order.id.slice(0, 8)}</p>
+                <p class="text-xs text-slate-500">Order #{order.id.slice(0, 8)}</p>
                 <p class="text-sm text-slate-500">Placed on {formatDate(order.createdAt)}</p>
                 <p class="mt-1 text-sm">
                   <span class="font-medium text-slate-600">Buyer:</span> {order.buyerEmail}
@@ -111,7 +123,7 @@ export default function SellerOrders() {
                       >
                         {item.productName}
                       </a>
-                      <p class="text-xs text-slate-400">Qty {item.quantity}</p>
+                      <p class="text-xs text-slate-500">Qty {item.quantity}</p>
                     </div>
                     <p class="shrink-0 self-center text-sm font-semibold text-slate-900">
                       {formatMoney(item.subtotalInCents, order.currency)}

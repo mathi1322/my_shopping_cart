@@ -187,19 +187,19 @@ function formatDate(iso: string): string {
             <div class="rounded-2xl border border-blue-200 bg-white p-4">
               <p class="text-xs font-semibold text-gray-500 uppercase">Orders</p>
               <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.totalOrders}</p>
-              <p class="mt-1 text-xs text-slate-400">{dashboard.placedOrders} placed</p>
+              <p class="mt-1 text-xs text-slate-500">{dashboard.placedOrders} placed</p>
             </div>
             <div class="rounded-2xl border border-blue-200 bg-white p-4">
               <p class="text-xs font-semibold text-gray-500 uppercase">Cancelled</p>
               <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.cancelledOrders}</p>
-              <p class="mt-1 text-xs text-slate-400">
+              <p class="mt-1 text-xs text-slate-500">
                 {dashboard.cancellationRatePercent}% of orders
               </p>
             </div>
             <div class="rounded-2xl border border-blue-200 bg-white p-4">
               <p class="text-xs font-semibold text-gray-500 uppercase">Customers</p>
               <p class="mt-1 text-2xl font-bold text-slate-900">{dashboard.uniqueCustomers}</p>
-              <p class="mt-1 text-xs text-slate-400">unique buyers</p>
+              <p class="mt-1 text-xs text-slate-500">unique buyers</p>
             </div>
             <div class="rounded-2xl border border-blue-200 bg-white p-4">
               <p class="text-xs font-semibold text-gray-500 uppercase">Avg order value</p>
@@ -220,7 +220,14 @@ function formatDate(iso: string): string {
             <h2 class="font-heading mb-3 text-sm font-bold text-gray-600">
               Revenue — last 14 days
             </h2>
-            <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} class="h-auto w-full" role="img">
+            <svg
+              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+              class="h-auto w-full"
+              role="img"
+              aria-label={`Daily revenue for the last 14 days, ${formatMoney(
+                points.reduce((sum, p) => sum + p.day.revenueInCents, 0),
+              )} in total`}
+            >
               {gridLines.map((line) => (
                 <>
                   <line
@@ -291,7 +298,12 @@ function formatDate(iso: string): string {
             ) : (
               <>
                 <div class="flex justify-center">
-                  <svg viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`} class="h-40 w-40" role="img">
+                  <svg
+                    viewBox={`0 0 ${DONUT_SIZE} ${DONUT_SIZE}`}
+                    class="h-40 w-40"
+                    role="img"
+                    aria-label="Share of revenue by product — values are listed beside the chart"
+                  >
                     <circle
                       cx={DONUT_CENTER}
                       cy={DONUT_CENTER}
@@ -356,11 +368,11 @@ function formatDate(iso: string): string {
                           {arc.label}
                         </span>
                       )}
-                      <span class="shrink-0 text-xs text-slate-400">{arc.unitsSold} sold</span>
+                      <span class="shrink-0 text-xs text-slate-500">{arc.unitsSold} sold</span>
                       <span class="w-16 shrink-0 text-right font-semibold text-slate-800">
                         {formatMoney(arc.revenueInCents)}
                       </span>
-                      <span class="w-9 shrink-0 text-right text-slate-400">{arc.percent}%</span>
+                      <span class="w-9 shrink-0 text-right text-slate-500">{arc.percent}%</span>
                     </li>
                   ))}
                 </ul>
@@ -392,7 +404,7 @@ function formatDate(iso: string): string {
                     style={{ background: categoryColor(cat.category) }}
                   />
                   <span class="min-w-0 flex-1 truncate text-slate-700">{cat.category}</span>
-                  <span class="shrink-0 text-slate-400">
+                  <span class="shrink-0 text-slate-500">
                     {Math.round((cat.revenueInCents / categoryTotalRevenue) * 100)}%
                   </span>
                   <span class="w-24 shrink-0 text-right font-semibold text-slate-800">
@@ -408,7 +420,7 @@ function formatDate(iso: string): string {
             <div class="overflow-x-auto">
               <table class="w-full text-sm">
                 <thead>
-                  <tr class="border-b border-slate-100 text-left text-xs text-slate-400 uppercase">
+                  <tr class="border-b border-slate-100 text-left text-xs text-slate-500 uppercase">
                     <th class="py-2 pr-2 font-medium">Order</th>
                     <th class="py-2 pr-2 font-medium">Buyer</th>
                     <th class="py-2 pr-2 font-medium">Date</th>
