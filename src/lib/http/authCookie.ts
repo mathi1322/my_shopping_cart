@@ -4,19 +4,24 @@ export const SESSION_COOKIE_NAME = 'sessionId';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days — matches DrizzleSessionStore's TTL
 
 /**
- * HTTPS-only in production builds. Browsers also accept Secure cookies on
- * http://localhost, so the Docker demo still works; set COOKIE_SECURE=false
- * only for a non-localhost plain-HTTP setup.
+ * Secure whenever the request arrived over HTTPS — directly, or via a trusted
+ * proxy's X-Forwarded-Proto (see ALLOWED_HOSTS in astro.config.mjs). Not on
+ * plain-HTTP localhost, because Safari drops Secure cookies there and login
+ * would silently fail. COOKIE_SECURE=true|false overrides the detection.
  */
-const SECURE = process.env.COOKIE_SECURE
-  ? process.env.COOKIE_SECURE === 'true'
-  : import.meta.env.PROD;
+function isSecureRequest(requestUrl: URL): boolean {
+  const override = process.env.COOKIE_SECURE;
+  if (override === 'true' || override === 'false') {
+    return override === 'true';
+  }
+  return requestUrl.protocol === 'https:';
+}
 
-export function setSessionCookie(cookies: AstroCookies, sessionId: string): void {
+export function setSessionCookie(cookies: AstroCookies, sessionId: string, requestUrl: URL): void {
   cookies.set(SESSION_COOKIE_NAME, sessionId, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: SECURE,
+    secure: isSecureRequest(requestUrl),
     path: '/',
     maxAge: MAX_AGE_SECONDS,
   });

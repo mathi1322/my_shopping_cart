@@ -3,21 +3,25 @@ import type { UserDto } from '@/application/identity/UserDto';
 
 interface FakeCookieJar {
   get(name: string): { value: string } | undefined;
-  set(name: string, value: string): void;
+  set(name: string, value: string, options?: Record<string, unknown>): void;
+  optionsFor(name: string): Record<string, unknown> | undefined;
   has(name: string): boolean;
   delete(name: string): void;
 }
 
 export function createFakeCookies(): FakeCookieJar {
   const store = new Map<string, string>();
+  const optionsByName = new Map<string, Record<string, unknown>>();
   return {
     get: (name) => {
       const value = store.get(name);
       return value !== undefined ? { value } : undefined;
     },
-    set: (name, value) => {
+    set: (name, value, options) => {
       store.set(name, value);
+      optionsByName.set(name, options ?? {});
     },
+    optionsFor: (name) => optionsByName.get(name),
     has: (name) => store.has(name),
     delete: (name) => {
       store.delete(name);

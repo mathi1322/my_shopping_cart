@@ -8,7 +8,7 @@ import { registerPerClientLimiter } from '../../../lib/http/rateLimit';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
+export const POST: APIRoute = async ({ request, cookies, clientAddress, url }) => {
   try {
     const body = await request.json();
     const input = registerSchema.parse(body);
@@ -22,7 +22,7 @@ export const POST: APIRoute = async ({ request, cookies, clientAddress }) => {
       await container.sessionStore.destroy(previousSessionId);
     }
     const sessionId = await container.sessionStore.create(user.id);
-    setSessionCookie(cookies, sessionId);
+    setSessionCookie(cookies, sessionId, url);
 
     return jsonResponse(user, 201);
   } catch (error) {

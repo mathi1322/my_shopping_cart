@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { POST as register } from '@/pages/api/auth/register';
+const registerRoute = register;
 import { POST as login } from '@/pages/api/auth/login';
 import { POST as logout } from '@/pages/api/auth/logout';
 import { GET as me } from '@/pages/api/auth/me';
@@ -67,6 +68,26 @@ describe('Auth API', () => {
     expect(secondSessionId).not.toBe(firstSessionId);
     expect(await container.sessionStore.resolve(firstSessionId)).toBeNull();
     expect(await container.sessionStore.resolve(secondSessionId)).not.toBeNull();
+  });
+
+  it('marks the session cookie Secure over HTTPS but not over plain HTTP', async () => {
+    const register = async (url: string) => {
+      const cookies = createFakeCookies();
+      await callRoute(registerRoute, {
+        request: jsonRequest(url, 'POST', {
+          email: `secure-${Math.random()}@example.com`,
+          password: 'password123',
+          role: 'buyer',
+        }),
+        cookies,
+      });
+      return cookies.optionsFor('sessionId');
+    };
+
+    expect((await register('https://shop.example.com/api/auth/register'))?.secure).toBe(true);
+    // Plain-HTTP localhost (the Docker demo): Safari would drop a Secure cookie here.
+    expect((await register('http://localhost:4321/api/auth/register'))?.secure).toBe(false);
+    expect((await register('http://localhost:4321/api/auth/register'))?.httpOnly).toBe(true);
   });
 
   it('registers a new user, returns 201, and sets a session cookie', async () => {
