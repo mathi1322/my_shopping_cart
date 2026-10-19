@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RegisterUserUseCase } from '@/application/identity/RegisterUserUseCase';
 import { AuthenticateUserUseCase } from '@/application/identity/AuthenticateUserUseCase';
 import { UnauthorizedError } from '@/domain/shared/DomainError';
@@ -9,10 +9,11 @@ import { RecordingEventPublisher } from '../_fakes/RecordingEventPublisher';
 describe('AuthenticateUserUseCase', () => {
   let repository: InMemoryUserRepository;
   let useCase: AuthenticateUserUseCase;
+  let hasher: FakePasswordHasher;
 
   beforeEach(async () => {
     repository = new InMemoryUserRepository();
-    const hasher = new FakePasswordHasher();
+    hasher = new FakePasswordHasher();
     useCase = new AuthenticateUserUseCase(repository, hasher);
 
     await new RegisterUserUseCase(repository, hasher, new RecordingEventPublisher()).execute({
@@ -36,6 +37,14 @@ describe('AuthenticateUserUseCase', () => {
     await expect(
       useCase.execute({ email: 'nobody@example.com', password: 'whatever' }),
     ).rejects.toThrow(UnauthorizedError);
+  });
+
+  it('still runs the password KDF for an unknown email, so timing does not reveal account existence', async () => {
+    const hashSpy = vi.spyOn(hasher, 'hash');
+    await expect(
+      useCase.execute({ email: 'nobody@example.com', password: 'whatever' }),
+    ).rejects.toThrow(UnauthorizedError);
+    expect(hashSpy).toHaveBeenCalledWith('whatever');
   });
 
   it('throws UnauthorizedError for a wrong password', async () => {

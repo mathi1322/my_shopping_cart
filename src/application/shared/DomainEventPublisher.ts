@@ -12,7 +12,14 @@ export interface DomainEventPublisher {
 export class ConsoleDomainEventPublisher implements DomainEventPublisher {
   async publish(events: DomainEvent[]): Promise<void> {
     for (const event of events) {
-      console.log(`[domain-event] ${event.name}`, JSON.stringify(event));
+      console.log(`[domain-event] ${event.name}`, JSON.stringify(event, redactPersonalData));
     }
   }
+}
+
+const PERSONAL_DATA_KEYS = new Set(['email', 'buyerEmail', 'phone', 'deliveryPhone', 'address']);
+
+/** Events keep full data for real subscribers; only the log output is redacted. */
+function redactPersonalData(key: string, value: unknown): unknown {
+  return PERSONAL_DATA_KEYS.has(key) ? '[redacted]' : value;
 }

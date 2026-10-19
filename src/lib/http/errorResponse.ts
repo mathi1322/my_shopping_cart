@@ -1,5 +1,5 @@
 import { ZodError } from 'zod';
-import { DomainError } from '../../domain/shared/DomainError';
+import { DomainError, TooManyRequestsError } from '../../domain/shared/DomainError';
 
 interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };
@@ -17,16 +17,24 @@ function statusForCode(code: string): number {
       return 401;
     case 'FORBIDDEN':
       return 403;
+    case 'RATE_LIMITED':
+      return 429;
     default:
       return 500;
   }
 }
 
-function jsonError(status: number, code: string, message: string, details?: unknown): Response {
+function jsonError(
+  status: number,
+  code: string,
+  message: string,
+  details?: unknown,
+  extraHeaders: Record<string, string> = {},
+): Response {
   const body: ApiErrorBody = { error: { code, message, ...(details ? { details } : {}) } };
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
   });
 }
 
@@ -37,6 +45,11 @@ export function toErrorResponse(error: unknown): Response {
   }
   if (error instanceof SyntaxError) {
     return jsonError(400, 'VALIDATION_ERROR', 'Malformed JSON body');
+  }
+  if (error instanceof TooManyRequestsError) {
+    return jsonError(429, error.code, error.message, undefined, {
+      'Retry-After': String(error.retryAfterSeconds),
+    });
   }
   if (error instanceof DomainError) {
     return jsonError(statusForCode(error.code), error.code, error.message);

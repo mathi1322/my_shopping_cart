@@ -21,6 +21,8 @@ export class AuthenticateUserUseCase {
     const email = Email.fromString(input.email);
     const user = await this.userRepository.findByEmail(email);
     if (!user) {
+      // Spend the same KDF time as a real check, so response timing doesn't reveal which emails exist.
+      await this.passwordHasher.hash(input.password);
       throw new UnauthorizedError(INVALID_CREDENTIALS_MESSAGE);
     }
 

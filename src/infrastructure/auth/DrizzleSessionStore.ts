@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, lte } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { sessions } from '../db/schema';
 import type { SessionStore } from '../../application/identity/SessionStore';
@@ -10,6 +10,10 @@ export class DrizzleSessionStore implements SessionStore {
   constructor(private readonly db: Database) {}
 
   async create(userId: string): Promise<string> {
+    // Housekeeping piggybacks on login/register, so expired rows never pile up
+    // (indexed on expires_at, so this stays cheap).
+    await this.db.delete(sessions).where(lte(sessions.expiresAt, new Date()));
+
     const id = randomBytes(32).toString('hex');
     await this.db.insert(sessions).values({
       id,

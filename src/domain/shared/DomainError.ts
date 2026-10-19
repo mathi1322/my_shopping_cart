@@ -28,3 +28,15 @@ export class UnauthorizedError extends DomainError {
 export class ForbiddenError extends DomainError {
   readonly code = 'FORBIDDEN';
 }
+
+/** Too many attempts in a short window (e.g. repeated failed logins). */
+export class TooManyRequestsError extends DomainError {
+  readonly code = 'RATE_LIMITED';
+
+  constructor(
+    message: string,
+    readonly retryAfterSeconds: number,
+  ) {
+    super(message);
+  }
+}

@@ -32,6 +32,7 @@ export async function callRoute(
     params?: Record<string, string>;
     cookies?: FakeCookieJar;
     user?: UserDto | null;
+    clientAddress?: string;
   },
 ): Promise<Response> {
   const context = {
@@ -40,6 +41,7 @@ export async function callRoute(
     cookies: options.cookies ?? createFakeCookies(),
     url: new URL(options.request.url),
     locals: { user: options.user ?? null },
+    clientAddress: options.clientAddress ?? '127.0.0.1',
   } as unknown as APIContext;
 
   const response = await handler(context);

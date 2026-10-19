@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { PRODUCT_CATEGORIES } from '../../domain/product/ProductCategory';
 
-const imagesSchema = z.array(z.string().trim().url()).max(8, 'A product can have at most 8 images');
+// https only: rejects javascript:, data:, and plain-http (mixed-content) image URLs.
+const imageUrlSchema = z.url({ protocol: /^https$/, error: 'Image URLs must start with https://' });
+const imagesSchema = z
+  .array(z.string().trim().pipe(imageUrlSchema))
+  .max(8, 'A product can have at most 8 images');
 const categorySchema = z.enum(PRODUCT_CATEGORIES);
 
 export const createProductSchema = z.object({

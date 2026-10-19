@@ -5,12 +5,68 @@ import { POST as logout } from '@/pages/api/auth/logout';
 import { GET as me } from '@/pages/api/auth/me';
 import { createTestDb, truncateAll } from '../setupDb';
 import { callRoute, createFakeCookies, jsonRequest } from './_httpTestUtils';
+import { resetRateLimits } from '@/lib/http/rateLimit';
+import { container } from '@/infrastructure/di/container';
 
 const { db } = createTestDb();
 
 describe('Auth API', () => {
   beforeEach(async () => {
     await truncateAll(db);
+    resetRateLimits();
+  });
+
+  it('returns 429 with Retry-After after too many failed logins for one account', async () => {
+    const attempt = () =>
+      callRoute(login, {
+        request: jsonRequest('http://localhost/api/auth/login', 'POST', {
+          email: 'victim@example.com',
+          password: 'wrong-password',
+        }),
+      });
+
+    for (let i = 0; i < 10; i += 1) {
+      expect((await attempt()).status).toBe(401);
+    }
+    const limited = await attempt();
+    expect(limited.status).toBe(429);
+    expect(Number(limited.headers.get('Retry-After'))).toBeGreaterThan(0);
+
+    // A different client is not affected.
+    const otherClient = await callRoute(login, {
+      request: jsonRequest('http://localhost/api/auth/login', 'POST', {
+        email: 'victim@example.com',
+        password: 'wrong-password',
+      }),
+      clientAddress: '10.0.0.2',
+    });
+    expect(otherClient.status).toBe(401);
+  });
+
+  it('invalidates the previous session when logging in again from the same browser', async () => {
+    const cookies = createFakeCookies();
+    await callRoute(register, {
+      request: jsonRequest('http://localhost/api/auth/register', 'POST', {
+        email: 'rotate@example.com',
+        password: 'password123',
+        role: 'buyer',
+      }),
+      cookies,
+    });
+    const firstSessionId = cookies.get('sessionId')!.value;
+
+    await callRoute(login, {
+      request: jsonRequest('http://localhost/api/auth/login', 'POST', {
+        email: 'rotate@example.com',
+        password: 'password123',
+      }),
+      cookies,
+    });
+    const secondSessionId = cookies.get('sessionId')!.value;
+
+    expect(secondSessionId).not.toBe(firstSessionId);
+    expect(await container.sessionStore.resolve(firstSessionId)).toBeNull();
+    expect(await container.sessionStore.resolve(secondSessionId)).not.toBeNull();
   });
 
   it('registers a new user, returns 201, and sets a session cookie', async () => {
