@@ -23,17 +23,19 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design rationale, layering, bou
 
 **Buyers** can:
 
-- Browse the catalog with a left-hand sidebar of filters — category, price band, in-stock only — plus free-text search, all as plain GET query params (shareable/bookmarkable, no client-side JS required to filter)
-- View a product's detail page: image gallery (multiple photos with thumbnail switching), description, features, and buyer reviews with a star rating average
+- Browse the catalog with a left-hand sidebar of filters — category, price band, in-stock only — plus free-text search, all as plain GET query params (shareable/bookmarkable, no client-side JS required to filter); results are paginated (12 per page, newest first), with filtering and paging done in the database
+- See who sells each product ("Sold by" shows the seller's company name, or their name), linking to that seller's storefront
+- View a product's detail page: image gallery (multiple photos with thumbnail switching), description, features, and reviews with a star rating average
 - Add to cart, adjust quantities, and check out with **Cash on Delivery** (the only payment method) through a two-step address → confirm flow
-- View order history at **My Orders** and cancel a `placed` order (stock is restored automatically)
+- Track each order at **My Orders** — `placed` → `shipped` → `delivered`, per item, as each seller updates it — and cancel an order until anything in it has shipped (stock is restored automatically)
+- **Write a review** (1–5 stars, optional comment) for a product once their order of it has been delivered — one review per product, shown with a "Verified purchase" label
 - Manage a profile at **Settings** — name, phone, address
 
 **Sellers** additionally get:
 
 - A product management screen (**My Products**, `/sell`) to add/edit/delete their own listings — name, description, price, stock, category, and up to 8 image URLs
-- **Orders Received** (`/sell/orders`) — every order containing at least one of their products, narrowed to just their own line items even when an order spans multiple sellers, with the buyer's email and delivery details
-- A live badge on the account menu showing how many `placed` (unfulfilled) orders they have
+- **Orders Received** (`/sell/orders`) — every order containing at least one of their products, narrowed to just their own line items even when an order spans multiple sellers, with the buyer's email and delivery details, and a **Mark as shipped** / **Mark as delivered** button that moves their items to the next step
+- A live badge on the account menu showing how many orders still have their items to ship
 - A **Dashboard** (`/sell/dashboard`) with total revenue (+ week-over-week change), order/cancellation counts, unique customers, average order value, a 14-day revenue trend chart, a top-3-products-by-revenue donut chart, a revenue-by-category breakdown, and a recent-orders table
 - Seller-only profile fields — company name, company address, and an optional GST number
 - A read-only storefront view of their own catalog, and a "View my store" link from their profile
@@ -124,7 +126,7 @@ CI (`.github/workflows/ci.yml`) runs formatting, lint, typecheck, unit tests, in
 
 All responses are JSON. Errors use the shape `{ "error": { "code": "...", "message": "...", "details"?: ... } }` with status 400 (validation), 401 (not logged in), 403 (logged in, but wrong role or not the owner), 404 (not found), 409 (conflict, e.g. insufficient stock, cart already empty, order already cancelled, or a price changed since the item was added — the cart is repriced so the buyer can review and resubmit), 429 (too many login/register attempts; see the `Retry-After` header), or 500.
 
-Not everything in the app goes through a JSON API — product reviews and the seller dashboard are read directly by their `.astro` pages via a use case (`container.listReviewsForProduct` / `container.getSellerDashboard`), since only that page ever needs the data and a round-trip through `fetch` would be pure overhead. Only endpoints actually called from client-side code are listed below.
+Not everything in the app goes through a JSON API — the catalog, product page and seller dashboard are rendered by their `.astro` pages calling a use case directly (`container.searchProducts` / `container.getProductReviews` / `container.getSellerDashboard`), since only that page ever needs the data and a round-trip through `fetch` would be pure overhead. Only endpoints actually called from client-side code are listed below.
 
 **Note on state-changing requests:** Astro's built-in CSRF protection (`security.checkOrigin`, on by default) rejects POST/PUT/DELETE requests whose `Origin` header doesn't match the request host. Browser `fetch` calls from the app's own UI satisfy this automatically. When testing with curl/Postman, add `-H "Origin: http://localhost:4321"`.
 
@@ -153,13 +155,20 @@ Fetching is public. Creating/updating/deleting requires a logged-in seller, and 
 
 | Method | Path                | Body                                                                                 | Notes                                                                |
 | ------ | ------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| GET    | `/api/products`     | —                                                                                    | Lists all products; `?vendorId=` filters to one seller               |
+| GET    | `/api/products`     | —                                                                                    | Paginated search (see below)                                         |
 | POST   | `/api/products`     | `{ name, description?, priceInCents, stockQuantity, category, images? }`             | Seller-only; 201; `vendorId` is taken from the session, not the body |
 | GET    | `/api/products/:id` | —                                                                                    | 404 if unknown                                                       |
 | PUT    | `/api/products/:id` | Any subset of `{ name, description, priceInCents, stockQuantity, category, images }` | Owning seller only; 403 otherwise                                    |
 | DELETE | `/api/products/:id` | —                                                                                    | Owning seller only; 204; 403 otherwise                               |
 
-The home page (`/`) itself supports `?q=` (search), `?category=` (repeatable), `?priceBand=` (`under-1000` / `1000-2000` / `above-2000`), `?inStock=1`, and `?vendorId=` as plain page query params — these filter server-side in `pages/index.astro`, not through the JSON API above.
+`GET /api/products` accepts `?q=` (name/description search), `?category=` (repeatable), `?inStock=1`, `?vendorId=`, `?page=` and `?pageSize=` (default 12, max 100), and returns `{ products, categories, total, page, pageSize, totalPages }`. Each product includes `vendorName`.
+
+| Method | Path                        | Body                  | Notes                                                                                                                                                   |
+| ------ | --------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/products/:id/reviews` | —                     | `{ reviews, count, averageRating, eligibility }`; `eligibility` says whether the caller can review (`eligible`, `not-delivered`, `already-reviewed`, …) |
+| POST   | `/api/products/:id/reviews` | `{ rating, comment }` | Buyer with a delivered order of this product only (403 otherwise); `rating` 1–5; 201; 409 if they already reviewed it                                   |
+
+The home page (`/`) supports the same filters plus `?priceBand=` (`under-1000` / `1000-2000` / `above-2000`) and `?page=` as plain page query params, filtered and paginated server-side.
 
 ### Cart
 
@@ -176,12 +185,15 @@ The cart belongs to the logged-in user (`carts.user_id`, unique per user) — **
 
 Placing an order snapshots the caller's current cart into an `Order`, re-checks stock for every item, decrements it, and empties the cart. Cancelling restores that stock. `paymentMethod` is always `"cod"` — Cash on Delivery is the only option today.
 
-| Method | Path                     | Body                                 | Notes                                                                                                          |
-| ------ | ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/orders`            | —                                    | Lists the caller's own orders (as buyer), most recent first                                                    |
-| POST   | `/api/orders`            | `{ deliveryAddress, deliveryPhone }` | 201; 409 if the cart is empty or stock no longer covers a cart item                                            |
-| GET    | `/api/orders/received`   | —                                    | Seller-only (403 for buyers); orders containing any of the caller's products, items narrowed to just their own |
-| POST   | `/api/orders/:id/cancel` | —                                    | Buyer-only, and only the order's own buyer; 403 otherwise; 409 if already cancelled                            |
+Each item has a `fulfillmentStatus` (`placed` → `shipped` → `delivered`) that its seller advances one step at a time. An order's `status` is `placed` until something ships, `shipped` once anything has, `delivered` when everything has, or `cancelled`. Order lists accept `?page=` and `?pageSize=` (default 10, max 50) and return `{ orders, total, page, pageSize, totalPages }`; `/api/orders/received` also returns `awaitingShipmentCount`. Items include `vendorName`.
+
+| Method | Path                          | Body                                 | Notes                                                                                                                   |
+| ------ | ----------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/orders`                 | —                                    | Lists the caller's own orders (as buyer), most recent first                                                             |
+| POST   | `/api/orders`                 | `{ deliveryAddress, deliveryPhone }` | 201; 409 if the cart is empty or stock no longer covers a cart item                                                     |
+| GET    | `/api/orders/received`        | —                                    | Seller-only (403 for buyers); orders containing any of the caller's products, items narrowed to just their own          |
+| POST   | `/api/orders/:id/cancel`      | —                                    | Buyer-only, and only the order's own buyer; 403 otherwise; 409 if already cancelled or anything has shipped             |
+| POST   | `/api/orders/:id/fulfillment` | `{ status }`                         | Seller-only, for their own items in the order; `status` is `shipped` or `delivered` (one step at a time); 409 otherwise |
 
 ## Project structure
 

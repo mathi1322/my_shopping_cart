@@ -28,9 +28,25 @@ Dependencies point inward only: `domain` knows nothing about `application`, `inf
 - **Product** (`domain/product`) — catalog data: name, description, price, stock, category (a fixed enum, `domain/product/ProductCategory.ts`), and a list of externally-hosted image URLs — plus which vendor (a `User.id`) owns the listing.
 - **Cart** (`domain/cart`) — a cart aggregate holding line items. Product name/price/vendor/image are **snapshotted** into each `CartItem` at add-to-cart time, so a vendor editing a product afterwards doesn't silently change what's already in someone's cart. At checkout the snapshot is compared with the product's current price: if it changed, the order is refused with a 409, the cart is repriced, and the buyer reviews the new total and resubmits — a buyer is never charged a price they haven't seen.
 - **Order** (`domain/order`) — created from a buyer's cart at checkout (`PlaceOrderUseCase`). Snapshots the same per-item fields as `CartItem` (name/price/vendor/image), plus the buyer's email, delivery address/phone, and a `status` of `placed`/`cancelled`. A `VendorId` on each line item is what lets `ListOrdersForVendorUseCase` answer "which orders contain my products" without Order depending on Product.
-- **Review** (`domain/review`) — deliberately not a full aggregate: reviews are read-only, seed/display data today (there's no submit-a-review flow), so there's nothing to protect with invariants or events. It's a plain `Review` shape plus a `ReviewRepository.findByProductId` — the minimum needed to keep the read path behind an interface, without the ceremony of an aggregate root that has no behavior.
+- **Review** (`domain/review`) — a small value-like record rather than an aggregate root: once written a review never changes, so its only rules are at creation (`writeReview`: rating 1–5, comment ≤ 2000 chars). Who may write one is a cross-context rule and lives in `WriteReviewUseCase`: a buyer whose order of the product has been **delivered** (`OrderRepository.hasDeliveredItem`), once — enforced by a `(product_id, author_id)` unique index, so concurrent duplicate submissions store one review. Seeded demo reviews have no author and aren't shown as verified purchases.
 
 These are separate aggregates on purpose: adding to a cart validates against the product's _current_ stock (an application-layer check, `AddItemToCartUseCase`) but never mutates the `Product` aggregate — the cart is just a working list. Stock is only actually decremented when an `Order` is placed (and restored if it's cancelled), because that's the point where a buyer is committing to a purchase; keeping that mutation out of the Cart context means the cart and product aggregates can still be persisted and evolved independently.
+
+### Order fulfillment
+
+A single order can contain items from several sellers, so fulfillment is tracked **per item**, not per order: each `OrderItem` has a `fulfillmentStatus`, and `Order.advanceFulfillment(vendorId, next)` moves one seller's items a single step (`placed` → `shipped` → `delivered`), leaving other sellers' items alone. `Order.status` is derived from the items (`placed` until anything ships, `shipped` once anything has, `delivered` when everything has) unless the buyer cancelled; it's also persisted on `orders.status` so lists can be queried without loading items. A seller sees `statusFor(theirVendorId)` — just their part of the order. The buyer can cancel only while the order is still `placed`; the update runs under the same order row lock as cancellation, so a cancel and a "mark shipped" can't interleave.
+
+### Seller names
+
+Products, cart items and order items store only a `vendorId`. Display names come from a read-side `VendorDirectory` port (`application/shared/VendorDirectory.ts`, implemented over the users table), looked up in one query per page: the seller's company name, else their name, else "MediKart seller" — never their id.
+
+### Pagination
+
+Catalog search (`ProductRepository.search`) and order lists filter, sort (newest first, id as tie-break) and page in SQL with `LIMIT/OFFSET` plus a `count()`, behind a small `Page`/`PageRequest` type in the domain. `application/shared/Paging.ts` clamps requested pages and sizes. Search text is matched with `ILIKE` with `%`/`_` escaped, so user input is always literal. The seller dashboard still reads all of a seller's orders, because it aggregates over all of them.
+
+### Content-Security-Policy
+
+Astro's `security.csp` emits a per-page policy with hashes for the scripts and styles it generates, so `script-src` and `style-src` contain no `'unsafe-inline'`. The UI therefore uses no inline `style` attributes — placeholder tiles use Tailwind classes, and dashboard bars and swatches are SVG presentation attributes. Images may come from any `https:` origin (sellers link product photos), fonts from Google Fonts; `object-src 'none'`, `base-uri`/`form-action 'self'` and `frame-ancestors 'none'` close off the rest. API responses get `default-src 'none'`. The e2e suite fails on any CSP violation in any browser.
 
 ### Analytics is a read-model, not a bounded context
 
