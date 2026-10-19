@@ -260,4 +260,45 @@ describe('Cart API', () => {
 
     expect(response.status).toBe(404);
   });
+
+  it("handles a new buyer's first cart requests arriving at the same time", async () => {
+    // Right after login the cart badge (GET /api/cart) and an add-to-cart can race to
+    // create the buyer's cart; every request must succeed and they must share one cart.
+    const product = await seedProduct({ stockQuantity: 100 });
+
+    for (let round = 0; round < 5; round += 1) {
+      const newBuyer = await seedTestUser(db, 'buyer');
+      const responses = await Promise.all(
+        Array.from({ length: 10 }, (_, i) =>
+          i % 2 === 0
+            ? callRoute(getCart, {
+                request: jsonRequest('http://localhost/api/cart', 'GET'),
+                user: newBuyer,
+              })
+            : callRoute(addItem, {
+                request: jsonRequest('http://localhost/api/cart/items', 'POST', {
+                  productId: product.id,
+                  quantity: 1,
+                }),
+                user: newBuyer,
+              }),
+        ),
+      );
+
+      expect(responses.map((r) => r.status).filter((status) => status >= 400)).toEqual([]);
+      const cartIds = new Set(
+        await Promise.all(responses.map(async (r) => (await r.json()).id as string)),
+      );
+      expect(cartIds.size).toBe(1);
+
+      // No add was lost to a concurrent overwrite: 5 adds of 1 unit each.
+      const finalCart = await (
+        await callRoute(getCart, {
+          request: jsonRequest('http://localhost/api/cart', 'GET'),
+          user: newBuyer,
+        })
+      ).json();
+      expect(finalCart.items[0].quantity).toBe(5);
+    }
+  });
 });

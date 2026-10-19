@@ -17,6 +17,12 @@ export class InMemoryCartRepository implements CartRepository {
     return this.findByUserId(userId);
   }
 
+  async createIfAbsent(cart: Cart): Promise<void> {
+    if (!(await this.findByUserId(cart.userId))) {
+      await this.save(cart);
+    }
+  }
+
   async save(cart: Cart): Promise<void> {
     this.carts.set(cart.id.toString(), cart);
   }

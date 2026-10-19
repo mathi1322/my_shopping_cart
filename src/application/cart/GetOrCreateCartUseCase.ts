@@ -10,8 +10,13 @@ export class GetOrCreateCartUseCase {
       return existing;
     }
 
-    const cart = Cart.create(userId);
-    await this.cartRepository.save(cart);
+    // Concurrent first requests (e.g. the cart badge and an add-to-cart right after
+    // login) may both get here; createIfAbsent lets exactly one of them create it.
+    await this.cartRepository.createIfAbsent(Cart.create(userId));
+    const cart = await this.cartRepository.findByUserId(userId);
+    if (!cart) {
+      throw new Error(`Cart for user ${userId} vanished right after creation`);
+    }
     return cart;
   }
 }

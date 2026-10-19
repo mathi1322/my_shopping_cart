@@ -203,14 +203,16 @@ describe('Orders API', () => {
     expect(response.status).toBe(403);
   });
 
-  it('sells the last unit to exactly one of two buyers checking out at the same time', async () => {
-    const product = await seedProduct({ stockQuantity: 1 });
-    const otherBuyer = await seedTestUser(db, 'buyer');
-    await addToCart(product.id, 1, buyer);
-    await addToCart(product.id, 1, otherBuyer);
+  it('never oversells when many buyers check out the same product at once', async () => {
+    const stock = 3;
+    const product = await seedProduct({ stockQuantity: stock });
+    const buyers = await Promise.all(Array.from({ length: 10 }, () => seedTestUser(db, 'buyer')));
+    for (const user of buyers) {
+      await addToCart(product.id, 1, user);
+    }
 
     const responses = await Promise.all(
-      [buyer, otherBuyer].map((user) =>
+      buyers.map((user) =>
         callRoute(placeOrderRoute, {
           request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
           user,
@@ -218,7 +220,9 @@ describe('Orders API', () => {
       ),
     );
 
-    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    const statuses = responses.map((r) => r.status);
+    expect(statuses.filter((s) => s === 201)).toHaveLength(stock);
+    expect(statuses.filter((s) => s === 409)).toHaveLength(buyers.length - stock);
     expect(await fetchStock(product.id)).toBe(0);
   });
 

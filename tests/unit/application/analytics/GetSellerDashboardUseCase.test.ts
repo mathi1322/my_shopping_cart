@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { CreateProductUseCase } from '@/application/product/CreateProductUseCase';
-import { GetOrCreateCartUseCase } from '@/application/cart/GetOrCreateCartUseCase';
 import { AddItemToCartUseCase } from '@/application/cart/AddItemToCartUseCase';
 import { PlaceOrderUseCase } from '@/application/order/PlaceOrderUseCase';
 import { CancelOrderUseCase } from '@/application/order/CancelOrderUseCase';
@@ -36,9 +35,8 @@ describe('GetSellerDashboardUseCase', () => {
     carts = new InMemoryCartRepository();
     ordersRepo = new InMemoryOrderRepository();
     events = new RecordingEventPublisher();
-    const getOrCreateCart = new GetOrCreateCartUseCase(carts);
-    addItemToCart = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
     const unitOfWork = new InMemoryUnitOfWork({ carts, orders: ordersRepo, products });
+    addItemToCart = new AddItemToCartUseCase(unitOfWork, events);
     placeOrder = new PlaceOrderUseCase(unitOfWork, carts, events);
     cancelOrder = new CancelOrderUseCase(unitOfWork, events);
     getDashboard = new GetSellerDashboardUseCase(ordersRepo, products);

@@ -62,6 +62,18 @@ export class DrizzleCartRepository implements CartRepository {
     });
   }
 
+  async createIfAbsent(cart: Cart): Promise<void> {
+    await this.db
+      .insert(carts)
+      .values({
+        id: cart.id.toString(),
+        userId: cart.userId,
+        createdAt: cart.createdAt,
+        updatedAt: cart.updatedAt,
+      })
+      .onConflictDoNothing({ target: carts.userId });
+  }
+
   async save(cart: Cart): Promise<void> {
     await this.db.transaction(async (tx) => {
       await tx

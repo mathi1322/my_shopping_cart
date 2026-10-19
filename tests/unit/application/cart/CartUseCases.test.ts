@@ -9,12 +9,15 @@ import { ConflictError, NotFoundError } from '@/domain/shared/DomainError';
 import { InMemoryProductRepository } from '../_fakes/InMemoryProductRepository';
 import { InMemoryCartRepository } from '../_fakes/InMemoryCartRepository';
 import { RecordingEventPublisher } from '../_fakes/RecordingEventPublisher';
+import { InMemoryOrderRepository } from '../_fakes/InMemoryOrderRepository';
+import { InMemoryUnitOfWork } from '../_fakes/InMemoryUnitOfWork';
 
 describe('Cart use cases', () => {
   let products: InMemoryProductRepository;
   let carts: InMemoryCartRepository;
   let events: RecordingEventPublisher;
   let getOrCreateCart: GetOrCreateCartUseCase;
+  let unitOfWork: InMemoryUnitOfWork;
 
   const buyerId = 'buyer-1';
   const otherBuyerId = 'buyer-2';
@@ -24,6 +27,7 @@ describe('Cart use cases', () => {
     carts = new InMemoryCartRepository();
     events = new RecordingEventPublisher();
     getOrCreateCart = new GetOrCreateCartUseCase(carts);
+    unitOfWork = new InMemoryUnitOfWork({ carts, orders: new InMemoryOrderRepository(), products });
   });
 
   const seller = { id: 'seller-1', role: 'seller' as const };
@@ -65,7 +69,7 @@ describe('Cart use cases', () => {
   describe('AddItemToCartUseCase', () => {
     it('adds a product to a new cart and returns totals', async () => {
       const product = await seedProduct();
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
 
       const cart = await useCase.execute({ userId: buyerId, productId: product.id, quantity: 2 });
       const dto = toCartDto(cart);
@@ -77,7 +81,7 @@ describe('Cart use cases', () => {
 
     it('merges quantities when adding the same product twice for the same user', async () => {
       const product = await seedProduct({ stockQuantity: 10 });
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
 
       await useCase.execute({ userId: buyerId, productId: product.id, quantity: 2 });
       const second = await useCase.execute({
@@ -92,7 +96,7 @@ describe('Cart use cases', () => {
 
     it('keeps carts isolated between different users', async () => {
       const product = await seedProduct({ stockQuantity: 10 });
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
 
       await useCase.execute({ userId: buyerId, productId: product.id, quantity: 2 });
       const theirs = await useCase.execute({
@@ -107,7 +111,7 @@ describe('Cart use cases', () => {
     });
 
     it('throws NotFoundError for an unknown product', async () => {
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
       await expect(
         useCase.execute({ userId: buyerId, productId: 'missing', quantity: 1 }),
       ).rejects.toThrow(NotFoundError);
@@ -115,7 +119,7 @@ describe('Cart use cases', () => {
 
     it('throws ConflictError when requested quantity exceeds available stock', async () => {
       const product = await seedProduct({ stockQuantity: 1 });
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
 
       await expect(
         useCase.execute({ userId: buyerId, productId: product.id, quantity: 2 }),
@@ -124,7 +128,7 @@ describe('Cart use cases', () => {
 
     it('accounts for quantity already in the cart when checking stock', async () => {
       const product = await seedProduct({ stockQuantity: 2 });
-      const useCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const useCase = new AddItemToCartUseCase(unitOfWork, events);
 
       await useCase.execute({ userId: buyerId, productId: product.id, quantity: 2 });
       await expect(
@@ -136,10 +140,10 @@ describe('Cart use cases', () => {
   describe('UpdateCartItemQuantityUseCase', () => {
     it('updates the quantity of an item already in the cart', async () => {
       const product = await seedProduct({ stockQuantity: 10 });
-      const addUseCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const addUseCase = new AddItemToCartUseCase(unitOfWork, events);
       await addUseCase.execute({ userId: buyerId, productId: product.id, quantity: 1 });
 
-      const useCase = new UpdateCartItemQuantityUseCase(carts, products, events);
+      const useCase = new UpdateCartItemQuantityUseCase(unitOfWork, events);
       const updated = await useCase.execute({
         userId: buyerId,
         productId: product.id,
@@ -150,7 +154,7 @@ describe('Cart use cases', () => {
     });
 
     it('throws NotFoundError for a user with no cart', async () => {
-      const useCase = new UpdateCartItemQuantityUseCase(carts, products, events);
+      const useCase = new UpdateCartItemQuantityUseCase(unitOfWork, events);
       await expect(
         useCase.execute({
           userId: 'no-cart-user',
@@ -162,10 +166,10 @@ describe('Cart use cases', () => {
 
     it('throws ConflictError when the new quantity exceeds available stock', async () => {
       const product = await seedProduct({ stockQuantity: 3 });
-      const addUseCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const addUseCase = new AddItemToCartUseCase(unitOfWork, events);
       await addUseCase.execute({ userId: buyerId, productId: product.id, quantity: 1 });
 
-      const useCase = new UpdateCartItemQuantityUseCase(carts, products, events);
+      const useCase = new UpdateCartItemQuantityUseCase(unitOfWork, events);
       await expect(
         useCase.execute({ userId: buyerId, productId: product.id, quantity: 4 }),
       ).rejects.toThrow(ConflictError);
@@ -175,10 +179,10 @@ describe('Cart use cases', () => {
   describe('RemoveCartItemUseCase', () => {
     it('removes an item from the cart', async () => {
       const product = await seedProduct();
-      const addUseCase = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
+      const addUseCase = new AddItemToCartUseCase(unitOfWork, events);
       await addUseCase.execute({ userId: buyerId, productId: product.id, quantity: 1 });
 
-      const useCase = new RemoveCartItemUseCase(carts, events);
+      const useCase = new RemoveCartItemUseCase(unitOfWork, events);
       const updated = await useCase.execute({
         userId: buyerId,
         productId: product.id,
@@ -188,7 +192,7 @@ describe('Cart use cases', () => {
     });
 
     it('throws NotFoundError for a user with no cart', async () => {
-      const useCase = new RemoveCartItemUseCase(carts, events);
+      const useCase = new RemoveCartItemUseCase(unitOfWork, events);
       await expect(useCase.execute({ userId: 'no-cart-user', productId: 'x' })).rejects.toThrow(
         NotFoundError,
       );

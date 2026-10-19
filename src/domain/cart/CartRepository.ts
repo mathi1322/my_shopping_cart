@@ -7,4 +7,6 @@ export interface CartRepository {
   /** Like findByUserId, but row-locks the cart until the surrounding UnitOfWork ends. */
   findByUserIdForUpdate(userId: string): Promise<Cart | null>;
   save(cart: Cart): Promise<void>;
+  /** Stores a new, empty cart unless the user already has one (safe under concurrent calls). */
+  createIfAbsent(cart: Cart): Promise<void>;
 }

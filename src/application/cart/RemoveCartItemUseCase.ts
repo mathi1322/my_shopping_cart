@@ -1,8 +1,8 @@
-import { Cart } from '../../domain/cart/Cart';
+import type { Cart } from '../../domain/cart/Cart';
 import { ProductId } from '../../domain/product/ProductId';
 import { NotFoundError } from '../../domain/shared/DomainError';
-import type { CartRepository } from '../../domain/cart/CartRepository';
 import type { DomainEventPublisher } from '../shared/DomainEventPublisher';
+import type { UnitOfWork } from '../shared/UnitOfWork';
 
 export interface RemoveCartItemInput {
   userId: string;
@@ -11,21 +11,23 @@ export interface RemoveCartItemInput {
 
 export class RemoveCartItemUseCase {
   constructor(
-    private readonly cartRepository: CartRepository,
+    private readonly unitOfWork: UnitOfWork,
     private readonly eventPublisher: DomainEventPublisher,
   ) {}
 
   async execute(input: RemoveCartItemInput): Promise<Cart> {
-    const cart = await this.cartRepository.findByUserId(input.userId);
-    if (!cart) {
-      throw new NotFoundError(`No cart found for user ${input.userId}`);
-    }
+    const cart = await this.unitOfWork.run(async ({ carts }) => {
+      const cart = await carts.findByUserIdForUpdate(input.userId);
+      if (!cart) {
+        throw new NotFoundError(`No cart found for user ${input.userId}`);
+      }
 
-    cart.removeItem(ProductId.fromString(input.productId));
+      cart.removeItem(ProductId.fromString(input.productId));
+      await carts.save(cart);
+      return cart;
+    });
 
-    await this.cartRepository.save(cart);
     await this.eventPublisher.publish(cart.pullDomainEvents());
-
     return cart;
   }
 }
