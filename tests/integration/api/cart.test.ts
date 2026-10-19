@@ -247,7 +247,10 @@ describe('Cart API', () => {
   it('returns 404 when removing an item that is not in the cart', async () => {
     const product = await seedProduct();
 
-    await callRoute(getCart, { request: jsonRequest('http://localhost/api/cart', 'GET'), user: buyer });
+    await callRoute(getCart, {
+      request: jsonRequest('http://localhost/api/cart', 'GET'),
+      user: buyer,
+    });
 
     const response = await callRoute(removeItem, {
       request: jsonRequest(`http://localhost/api/cart/items/${product.id}`, 'DELETE'),

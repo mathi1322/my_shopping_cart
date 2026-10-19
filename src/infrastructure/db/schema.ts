@@ -8,7 +8,10 @@ import {
   timestamp,
   varchar,
 } from 'drizzle-orm/pg-core';
-import { PRODUCT_CATEGORIES, FALLBACK_PRODUCT_CATEGORY } from '../../domain/product/ProductCategory';
+import {
+  PRODUCT_CATEGORIES,
+  FALLBACK_PRODUCT_CATEGORY,
+} from '../../domain/product/ProductCategory';
 
 export const userRole = pgEnum('user_role', ['buyer', 'seller']);
 

@@ -15,14 +15,34 @@ function tabClass(tab: string): string {
 ---
 
 <div class="mb-4 flex flex-wrap gap-2">
-  {isSeller && <a href="/sell/dashboard" class={tabClass('dashboard')}>Dashboard</a>}
+  {
+    isSeller && (
+      <a href="/sell/dashboard" class={tabClass('dashboard')}>
+        Dashboard
+      </a>
+    )
+  }
   <a href="/profile" class={tabClass('settings')}>Settings</a>
   <a href="/orders" class={tabClass('orders')}>My Orders</a>
-  {isSeller && <a href="/sell" class={tabClass('products')}>My Products</a>}
-  {isSeller && <a href={`/?vendorId=${userId}`} class={tabClass('store')}>My Store</a>}
-  {isSeller && (
-    <a href="/sell/orders" class={tabClass('received')}>
-      Orders Received
-    </a>
-  )}
+  {
+    isSeller && (
+      <a href="/sell" class={tabClass('products')}>
+        My Products
+      </a>
+    )
+  }
+  {
+    isSeller && (
+      <a href={`/?vendorId=${userId}`} class={tabClass('store')}>
+        My Store
+      </a>
+    )
+  }
+  {
+    isSeller && (
+      <a href="/sell/orders" class={tabClass('received')}>
+        Orders Received
+      </a>
+    )
+  }
 </div>

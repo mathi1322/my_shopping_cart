@@ -79,7 +79,7 @@ export default function CartBadge({ initialLoggedIn }: Props) {
       </svg>
       <span class="hidden sm:inline">Cart</span>
       {count !== null && count > 0 && (
-        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-slate-900">
+        <span class="bg-accent inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold text-slate-900">
           {count}
         </span>
       )}

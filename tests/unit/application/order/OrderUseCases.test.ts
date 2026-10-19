@@ -146,7 +146,12 @@ describe('Order use cases', () => {
     it('lists a buyer’s own orders and narrows vendor orders to that vendor’s items', async () => {
       const otherSeller = { id: 'seller-2', role: 'seller' as const };
       const mine = await new CreateProductUseCase(products, events).execute(
-        { name: 'Pulse Oximeter', description: 'SpO2 meter', priceInCents: 129900, stockQuantity: 10 },
+        {
+          name: 'Pulse Oximeter',
+          description: 'SpO2 meter',
+          priceInCents: 129900,
+          stockQuantity: 10,
+        },
         seller,
       );
       const theirs = await new CreateProductUseCase(products, events).execute(

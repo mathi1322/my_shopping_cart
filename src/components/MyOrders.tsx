@@ -28,7 +28,11 @@ function formatMoney(cents: number, currency: string): string {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 }
 
 export default function MyOrders() {
@@ -78,7 +82,7 @@ export default function MyOrders() {
         <p class="text-lg font-medium text-slate-700">You haven't placed any orders yet</p>
         <a
           href="/"
-          class="mt-3 inline-block rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+          class="bg-brand hover:bg-brand-dark mt-3 inline-block rounded-full px-5 py-2 text-sm font-semibold text-white"
         >
           Shop now
         </a>
@@ -132,7 +136,7 @@ export default function MyOrders() {
                   <div class="flex min-w-0 flex-1 flex-col justify-center">
                     <a
                       href={`/products/${item.productId}`}
-                      class="truncate text-sm font-medium text-slate-800 hover:text-brand hover:underline"
+                      class="hover:text-brand truncate text-sm font-medium text-slate-800 hover:underline"
                     >
                       {item.productName}
                     </a>

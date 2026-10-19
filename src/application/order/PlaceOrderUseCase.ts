@@ -34,9 +34,7 @@ export class PlaceOrderUseCase {
       const product = await this.productRepository.findById(item.productId);
       if (!product || !product.hasStockFor(item.quantity.value)) {
         const available = product?.stockQuantity ?? 0;
-        throw new ConflictError(
-          `Only ${available} unit(s) of "${item.productName}" are available`,
-        );
+        throw new ConflictError(`Only ${available} unit(s) of "${item.productName}" are available`);
       }
     }
 

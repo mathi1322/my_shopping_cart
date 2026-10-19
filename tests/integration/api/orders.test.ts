@@ -168,7 +168,7 @@ describe('Orders API', () => {
     expect(cancelResponse.status).toBe(403);
   });
 
-  it("lets the seller see orders containing their products, narrowed to their own items", async () => {
+  it('lets the seller see orders containing their products, narrowed to their own items', async () => {
     const product = await seedProduct();
     await addToCart(product.id);
     await callRoute(placeOrderRoute, {

@@ -127,9 +127,7 @@ export class Order extends AggregateRoot {
       throw new ValidationError('Delivery address is required');
     }
     if (address.trim().length > MAX_ADDRESS_LENGTH) {
-      throw new ValidationError(
-        `Delivery address cannot exceed ${MAX_ADDRESS_LENGTH} characters`,
-      );
+      throw new ValidationError(`Delivery address cannot exceed ${MAX_ADDRESS_LENGTH} characters`);
     }
   }
 

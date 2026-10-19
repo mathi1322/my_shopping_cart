@@ -65,7 +65,13 @@ function buildTrend(vendorOrders: VendorOrderSlice[], windowDays: number): Daily
     const day = new Date(today);
     day.setDate(day.getDate() - i);
     const key = dateKey(day);
-    buckets.set(key, { date: key, label: dayLabel(day), placedCount: 0, cancelledCount: 0, revenueInCents: 0 });
+    buckets.set(key, {
+      date: key,
+      label: dayLabel(day),
+      placedCount: 0,
+      cancelledCount: 0,
+      revenueInCents: 0,
+    });
   }
 
   for (const { order, items } of vendorOrders) {
@@ -131,7 +137,11 @@ export class GetSellerDashboardUseCase {
     for (const [productId, stat] of productStats) {
       const product = await this.productRepository.findById(ProductId.fromString(productId));
       const category = product?.category ?? FALLBACK_CATEGORY;
-      const existing = categoryTotals.get(category) ?? { category, unitsSold: 0, revenueInCents: 0 };
+      const existing = categoryTotals.get(category) ?? {
+        category,
+        unitsSold: 0,
+        revenueInCents: 0,
+      };
       existing.unitsSold += stat.unitsSold;
       existing.revenueInCents += stat.revenueInCents;
       categoryTotals.set(category, existing);
@@ -143,16 +153,16 @@ export class GetSellerDashboardUseCase {
     const last14Days = buildTrend(vendorOrders, TREND_WINDOW_DAYS);
     const revenueDeltaPercent = weekOverWeekDelta(last14Days);
 
-    const recentOrders: RecentOrderStat[] = vendorOrders.slice(0, RECENT_ORDERS_LIMIT).map(
-      ({ order, items }) => ({
+    const recentOrders: RecentOrderStat[] = vendorOrders
+      .slice(0, RECENT_ORDERS_LIMIT)
+      .map(({ order, items }) => ({
         id: order.id.toString(),
         buyerEmail: order.buyerEmail,
         createdAt: order.createdAt.toISOString(),
         status: order.status,
         itemCount: unitsOf(items),
         totalInCents: revenueOf(items),
-      }),
-    );
+      }));
 
     return {
       currency,

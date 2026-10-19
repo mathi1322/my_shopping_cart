@@ -24,9 +24,7 @@ const demoSellerEmails = [
 ];
 const demoBuyerEmail = 'buyer@medikart.test';
 
-const demoProducts: Array<
-  CreateProductInput & { sellerIndex: number; reviews: DemoReview[] }
-> = [
+const demoProducts: Array<CreateProductInput & { sellerIndex: number; reviews: DemoReview[] }> = [
   {
     sellerIndex: 0,
     name: 'Digital Infrared Thermometer',
@@ -59,7 +57,8 @@ const demoProducts: Array<
   {
     sellerIndex: 1,
     name: 'Fingertip Pulse Oximeter',
-    description: 'Compact fingertip device that measures blood oxygen saturation (SpO2) and pulse rate.',
+    description:
+      'Compact fingertip device that measures blood oxygen saturation (SpO2) and pulse rate.',
     priceInCents: 129900,
     stockQuantity: 60,
     category: 'Diagnostic Devices',
@@ -120,7 +119,8 @@ const demoProducts: Array<
   {
     sellerIndex: 2,
     name: 'N95 Respirator Masks (Pack of 20)',
-    description: 'NIOSH-certified N95 respirator masks for everyday protection against airborne particles.',
+    description:
+      'NIOSH-certified N95 respirator masks for everyday protection against airborne particles.',
     priceInCents: 59900,
     stockQuantity: 100,
     category: 'PPE & Masks',

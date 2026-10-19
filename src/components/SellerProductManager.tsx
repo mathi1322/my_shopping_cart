@@ -76,7 +76,7 @@ function ImageUrlsField({ images, onChange }: ImageUrlsFieldProps) {
         <button
           type="button"
           onClick={addUrl}
-          class="rounded-full bg-brand px-3 py-2 text-xs font-bold text-white uppercase hover:bg-brand-dark"
+          class="bg-brand hover:bg-brand-dark rounded-full px-3 py-2 text-xs font-bold text-white uppercase"
         >
           Add
         </button>
@@ -286,7 +286,7 @@ export default function SellerProductManager({ vendorId }: Props) {
         <button
           type="submit"
           disabled={creating}
-          class="mt-3 rounded-full bg-brand px-4 py-2 text-xs font-bold tracking-wide text-white uppercase hover:bg-brand-dark disabled:opacity-60"
+          class="bg-brand hover:bg-brand-dark mt-3 rounded-full px-4 py-2 text-xs font-bold tracking-wide text-white uppercase disabled:opacity-60"
         >
           {creating ? 'Adding…' : 'Add product'}
         </button>
@@ -370,7 +370,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                     <button
                       onClick={() => saveEdit(product.id)}
                       disabled={savingId === product.id}
-                      class="rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white uppercase hover:bg-brand-dark disabled:opacity-60"
+                      class="bg-brand hover:bg-brand-dark rounded-full px-3 py-1.5 text-xs font-bold text-white uppercase disabled:opacity-60"
                     >
                       Save
                     </button>
@@ -408,7 +408,7 @@ export default function SellerProductManager({ vendorId }: Props) {
                   <div class="flex gap-4">
                     <button
                       onClick={() => startEdit(product)}
-                      class="text-sm font-semibold text-brand uppercase hover:underline"
+                      class="text-brand text-sm font-semibold uppercase hover:underline"
                     >
                       Edit
                     </button>

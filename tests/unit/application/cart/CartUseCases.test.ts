@@ -189,9 +189,9 @@ describe('Cart use cases', () => {
 
     it('throws NotFoundError for a user with no cart', async () => {
       const useCase = new RemoveCartItemUseCase(carts, events);
-      await expect(
-        useCase.execute({ userId: 'no-cart-user', productId: 'x' }),
-      ).rejects.toThrow(NotFoundError);
+      await expect(useCase.execute({ userId: 'no-cart-user', productId: 'x' })).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });

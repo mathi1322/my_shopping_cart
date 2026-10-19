@@ -82,7 +82,7 @@ export default function AuthStatus({ initialUser }: Props) {
         onClick={() => setOpen((value) => !value)}
         aria-label="Account menu"
         aria-expanded={open}
-        class="flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2 hover:bg-white/10"
+        class="flex items-center gap-1.5 rounded-full py-1 pr-2 pl-1 hover:bg-white/10"
       >
         <span
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-slate-700"
@@ -113,7 +113,7 @@ export default function AuthStatus({ initialUser }: Props) {
           {isSeller && (
             <a
               href="/sell/dashboard"
-              class="block px-4 py-2 text-sm font-medium text-brand hover:bg-blue-50"
+              class="text-brand block px-4 py-2 text-sm font-medium hover:bg-blue-50"
             >
               Dashboard
             </a>
@@ -141,7 +141,7 @@ export default function AuthStatus({ initialUser }: Props) {
               >
                 Orders Received
                 {pendingOrderCount > 0 && (
-                  <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-slate-900">
+                  <span class="bg-accent inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold text-slate-900">
                     {pendingOrderCount}
                   </span>
                 )}

@@ -36,7 +36,8 @@ if (selectedCategories.length > 0) {
 if (selectedPriceBand) {
   products = products.filter(
     (product) =>
-      product.priceInCents >= selectedPriceBand.min && product.priceInCents <= selectedPriceBand.max,
+      product.priceInCents >= selectedPriceBand.min &&
+      product.priceInCents <= selectedPriceBand.max,
   );
 }
 if (inStockOnly) {
@@ -105,7 +106,10 @@ function formatMoney(cents: number, currency: string): string {
         <h2 class="font-heading text-sm font-bold text-gray-600">Filters</h2>
         {
           hasActiveFilters && (
-            <a href={buildUrl({ categories: [], priceBand: '', inStock: false })} class="text-xs text-brand hover:underline">
+            <a
+              href={buildUrl({ categories: [], priceBand: '', inStock: false })}
+              class="text-brand text-xs hover:underline"
+            >
               Clear filters
             </a>
           )
@@ -138,31 +142,35 @@ function formatMoney(cents: number, currency: string): string {
       <div class="mt-4">
         <p class="mb-2 text-xs font-semibold text-gray-500 uppercase">Price</p>
         <div class="flex flex-col gap-2">
-          {PRICE_BANDS.map((band) => (
-            <label class="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="radio"
-                name="priceBand"
-                value={band.value}
-                form="filters-form"
-                checked={priceBandValue === band.value}
-                class="h-4 w-4 accent-[#1341a3]"
-              />
-              {band.label}
-            </label>
-          ))}
-          {priceBandValue && (
-            <label class="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="radio"
-                name="priceBand"
-                value=""
-                form="filters-form"
-                class="h-4 w-4 accent-[#1341a3]"
-              />
-              Any price
-            </label>
-          )}
+          {
+            PRICE_BANDS.map((band) => (
+              <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="priceBand"
+                  value={band.value}
+                  form="filters-form"
+                  checked={priceBandValue === band.value}
+                  class="h-4 w-4 accent-[#1341a3]"
+                />
+                {band.label}
+              </label>
+            ))
+          }
+          {
+            priceBandValue && (
+              <label class="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="radio"
+                  name="priceBand"
+                  value=""
+                  form="filters-form"
+                  class="h-4 w-4 accent-[#1341a3]"
+                />
+                Any price
+              </label>
+            )
+          }
         </div>
       </div>
 
@@ -180,12 +188,16 @@ function formatMoney(cents: number, currency: string): string {
         </label>
       </div>
 
-      {vendorIdFilter && <input type="hidden" name="vendorId" value={vendorIdFilter} form="filters-form" />}
+      {
+        vendorIdFilter && (
+          <input type="hidden" name="vendorId" value={vendorIdFilter} form="filters-form" />
+        )
+      }
 
       <button
         type="submit"
         form="filters-form"
-        class="mt-5 w-full rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+        class="bg-brand hover:bg-brand-dark mt-5 w-full rounded-full px-4 py-2 text-sm font-semibold text-white"
       >
         Apply Filters
       </button>
@@ -224,7 +236,7 @@ function formatMoney(cents: number, currency: string): string {
                       </div>
                     )}
                     <div class="flex flex-1 flex-col p-4 sm:p-6">
-                      <h2 class="line-clamp-2 font-heading text-sm font-bold text-gray-600 sm:text-base">
+                      <h2 class="font-heading line-clamp-2 text-sm font-bold text-gray-600 sm:text-base">
                         {product.name}
                       </h2>
                       <p class="mt-1 line-clamp-2 text-xs font-medium text-gray-500">
@@ -249,7 +261,7 @@ function formatMoney(cents: number, currency: string): string {
                             ? `${product.stockQuantity} in stock`
                             : 'Out of stock'}
                         </span>
-                        <span class="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-brand">
+                        <span class="text-brand rounded border border-blue-200 px-2 py-1 text-xs font-medium">
                           {product.category}
                         </span>
                       </div>

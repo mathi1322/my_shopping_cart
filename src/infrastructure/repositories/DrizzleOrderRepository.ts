@@ -94,16 +94,18 @@ export class DrizzleOrderRepository implements OrderRepository {
     const rows = await this.db
       .select()
       .from(orders)
-      .where(inArray(orders.id, matchingOrderIds.map((row) => row.orderId)))
+      .where(
+        inArray(
+          orders.id,
+          matchingOrderIds.map((row) => row.orderId),
+        ),
+      )
       .orderBy(desc(orders.createdAt));
     return Promise.all(rows.map((row) => this.hydrate(row)));
   }
 
   private async hydrate(row: OrderRow): Promise<Order> {
-    const itemRows = await this.db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, row.id));
+    const itemRows = await this.db.select().from(orderItems).where(eq(orderItems.orderId, row.id));
 
     return Order.reconstitute({
       id: OrderId.fromString(row.id),

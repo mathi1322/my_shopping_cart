@@ -9,7 +9,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for the design rationale, layering, bou
 ## Tech stack
 
 | Concern          | Choice                                                                                    |
-| ----------------- | ------------------------------------------------------------------------------------------ |
+| ---------------- | ----------------------------------------------------------------------------------------- |
 | Framework        | Astro 7 (TypeScript), SSR API routes as the backend — no separate server                  |
 | UI               | Astro pages + Preact islands for interactivity, Tailwind CSS v4                           |
 | Database         | PostgreSQL 16                                                                             |
@@ -45,7 +45,7 @@ Everything above is server-rendered from real Postgres data — there's no mocke
 There are two roles, chosen at registration:
 
 - **Buyer** — browse, filter, and search products; use the cart; place Cash-on-Delivery orders; view and cancel orders; manage a personal profile.
-- **Seller** — everything a buyer can do, plus product management, an incoming-orders view, a sales dashboard, and company/GST profile fields. A seller can only ever modify products they created, and only ever cancel orders they placed as a buyer (not orders placed *for* their products — that action belongs to the buyer who placed it).
+- **Seller** — everything a buyer can do, plus product management, an incoming-orders view, a sales dashboard, and company/GST profile fields. A seller can only ever modify products they created, and only ever cancel orders they placed as a buyer (not orders placed _for_ their products — that action belongs to the buyer who placed it).
 
 Register at `/register`, log in at `/login`. Once logged in, the account menu (top right) links to Profile, My Orders, My Cart, and — for sellers — Dashboard, My Products, My Store, and Orders Received.
 
@@ -114,17 +114,17 @@ Not everything in the app goes through a JSON API — product reviews and the se
 Sessions are an httpOnly `sessionId` cookie backed by a server-side session table (not a JWT) — set automatically by register/login, cleared by logout.
 
 | Method | Path                 | Body                        | Notes                                                      |
-| ------ | -------------------- | ---------------------------- | ----------------------------------------------------------- |
-| POST   | `/api/auth/register` | `{ email, password, role }` | `role` is `"buyer"` or `"seller"`; 201, 409 if email taken  |
-| POST   | `/api/auth/login`    | `{ email, password }`       | 401 on wrong email/password                                 |
-| POST   | `/api/auth/logout`   | —                            | 204, clears the session                                     |
-| GET    | `/api/auth/me`       | —                            | `{ user: UserDto \| null }`                                 |
+| ------ | -------------------- | --------------------------- | ---------------------------------------------------------- |
+| POST   | `/api/auth/register` | `{ email, password, role }` | `role` is `"buyer"` or `"seller"`; 201, 409 if email taken |
+| POST   | `/api/auth/login`    | `{ email, password }`       | 401 on wrong email/password                                |
+| POST   | `/api/auth/logout`   | —                           | 204, clears the session                                    |
+| GET    | `/api/auth/me`       | —                           | `{ user: UserDto \| null }`                                |
 
 ### Users (profile)
 
-| Method | Path            | Body                                                                                             | Notes                                                              |
-| ------ | ---------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| PUT    | `/api/users/me`  | Any subset of `{ name, phone, address, companyName, companyAddress, gstNumber }`                 | Requires login; an empty string clears a field to `null`; `gstNumber` is optional and unvalidated in format |
+| Method | Path            | Body                                                                             | Notes                                                                                                       |
+| ------ | --------------- | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| PUT    | `/api/users/me` | Any subset of `{ name, phone, address, companyName, companyAddress, gstNumber }` | Requires login; an empty string clears a field to `null`; `gstNumber` is optional and unvalidated in format |
 
 ### Products
 
@@ -132,13 +132,13 @@ Fetching is public. Creating/updating/deleting requires a logged-in seller, and 
 
 `category` must be one of the fixed values in `domain/product/ProductCategory.ts` (currently: `Diagnostic Devices`, `PPE & Masks`, `Personal Care & Fitness`, `Mobility & Support`, `First Aid & Wellness`). `images` is an array of up to 8 externally-hosted URLs (no file upload — see [ARCHITECTURE.md](./ARCHITECTURE.md)).
 
-| Method | Path                | Body                                                                                  | Notes                                                                  |
-| ------ | -------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| GET    | `/api/products`     | —                                                                                      | Lists all products; `?vendorId=` filters to one seller                |
-| POST   | `/api/products`     | `{ name, description?, priceInCents, stockQuantity, category, images? }`             | Seller-only; 201; `vendorId` is taken from the session, not the body   |
-| GET    | `/api/products/:id` | —                                                                                      | 404 if unknown                                                         |
-| PUT    | `/api/products/:id` | Any subset of `{ name, description, priceInCents, stockQuantity, category, images }` | Owning seller only; 403 otherwise                                      |
-| DELETE | `/api/products/:id` | —                                                                                      | Owning seller only; 204; 403 otherwise                                 |
+| Method | Path                | Body                                                                                 | Notes                                                                |
+| ------ | ------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| GET    | `/api/products`     | —                                                                                    | Lists all products; `?vendorId=` filters to one seller               |
+| POST   | `/api/products`     | `{ name, description?, priceInCents, stockQuantity, category, images? }`             | Seller-only; 201; `vendorId` is taken from the session, not the body |
+| GET    | `/api/products/:id` | —                                                                                    | 404 if unknown                                                       |
+| PUT    | `/api/products/:id` | Any subset of `{ name, description, priceInCents, stockQuantity, category, images }` | Owning seller only; 403 otherwise                                    |
+| DELETE | `/api/products/:id` | —                                                                                    | Owning seller only; 204; 403 otherwise                               |
 
 The home page (`/`) itself supports `?q=` (search), `?category=` (repeatable), `?priceBand=` (`under-1000` / `1000-2000` / `above-2000`), `?inStock=1`, and `?vendorId=` as plain page query params — these filter server-side in `pages/index.astro`, not through the JSON API above.
 
@@ -146,23 +146,23 @@ The home page (`/`) itself supports `?q=` (search), `?category=` (repeatable), `
 
 The cart belongs to the logged-in user (`carts.user_id`, unique per user) — **there is no guest cart**. Every route below requires a session and operates on the caller's own cart; there's no cart-identifying cookie or client-supplied cart id.
 
-| Method | Path                         | Body                      | Notes                                                          |
-| ------ | ----------------------------- | --------------------------- | ----------------------------------------------------------------- |
-| GET    | `/api/cart`                  | —                         | Returns (or creates) the caller's cart; 401 if logged out       |
-| POST   | `/api/cart/items`            | `{ productId, quantity }` | 201, 404 unknown product, 409 insufficient stock                |
-| PUT    | `/api/cart/items/:productId` | `{ quantity }`            | Sets absolute quantity; 404/409 as above                        |
-| DELETE | `/api/cart/items/:productId` | —                         | Removes the line item                                           |
+| Method | Path                         | Body                      | Notes                                                     |
+| ------ | ---------------------------- | ------------------------- | --------------------------------------------------------- |
+| GET    | `/api/cart`                  | —                         | Returns (or creates) the caller's cart; 401 if logged out |
+| POST   | `/api/cart/items`            | `{ productId, quantity }` | 201, 404 unknown product, 409 insufficient stock          |
+| PUT    | `/api/cart/items/:productId` | `{ quantity }`            | Sets absolute quantity; 404/409 as above                  |
+| DELETE | `/api/cart/items/:productId` | —                         | Removes the line item                                     |
 
 ### Orders
 
 Placing an order snapshots the caller's current cart into an `Order`, re-checks stock for every item, decrements it, and empties the cart. Cancelling restores that stock. `paymentMethod` is always `"cod"` — Cash on Delivery is the only option today.
 
-| Method | Path                       | Body                                    | Notes                                                                                          |
-| ------ | ---------------------------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------- |
-| GET    | `/api/orders`               | —                                        | Lists the caller's own orders (as buyer), most recent first                                     |
-| POST   | `/api/orders`               | `{ deliveryAddress, deliveryPhone }`     | 201; 409 if the cart is empty or stock no longer covers a cart item                              |
-| GET    | `/api/orders/received`      | —                                        | Seller-only (403 for buyers); orders containing any of the caller's products, items narrowed to just their own |
-| POST   | `/api/orders/:id/cancel`    | —                                        | Buyer-only, and only the order's own buyer; 403 otherwise; 409 if already cancelled              |
+| Method | Path                     | Body                                 | Notes                                                                                                          |
+| ------ | ------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/orders`            | —                                    | Lists the caller's own orders (as buyer), most recent first                                                    |
+| POST   | `/api/orders`            | `{ deliveryAddress, deliveryPhone }` | 201; 409 if the cart is empty or stock no longer covers a cart item                                            |
+| GET    | `/api/orders/received`   | —                                    | Seller-only (403 for buyers); orders containing any of the caller's products, items narrowed to just their own |
+| POST   | `/api/orders/:id/cancel` | —                                    | Buyer-only, and only the order's own buyer; 403 otherwise; 409 if already cancelled                            |
 
 ## Project structure
 

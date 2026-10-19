@@ -110,7 +110,7 @@ export default function AddToCartControl({ productId, stockQuantity, initialLogg
       <button
         type="submit"
         disabled={status === 'loading'}
-        class="w-full rounded-full bg-brand px-3 py-2 text-xs font-bold tracking-wide text-white uppercase shadow-sm hover:bg-brand-dark disabled:opacity-60 sm:text-sm"
+        class="bg-brand hover:bg-brand-dark w-full rounded-full px-3 py-2 text-xs font-bold tracking-wide text-white uppercase shadow-sm disabled:opacity-60 sm:text-sm"
       >
         {status === 'loading' ? 'Adding…' : 'Add to cart'}
       </button>

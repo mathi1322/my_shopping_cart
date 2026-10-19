@@ -1,0 +1,5 @@
+drizzle/
+package-lock.json
+dist/
+.astro/
+coverage/

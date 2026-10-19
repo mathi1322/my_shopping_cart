@@ -36,19 +36,12 @@ export class DrizzleCartRepository implements CartRepository {
   }
 
   async findByUserId(userId: string): Promise<Cart | null> {
-    const [cartRow] = await this.db
-      .select()
-      .from(carts)
-      .where(eq(carts.userId, userId))
-      .limit(1);
+    const [cartRow] = await this.db.select().from(carts).where(eq(carts.userId, userId)).limit(1);
     return cartRow ? this.hydrate(cartRow) : null;
   }
 
   private async hydrate(cartRow: typeof carts.$inferSelect): Promise<Cart> {
-    const itemRows = await this.db
-      .select()
-      .from(cartItems)
-      .where(eq(cartItems.cartId, cartRow.id));
+    const itemRows = await this.db.select().from(cartItems).where(eq(cartItems.cartId, cartRow.id));
 
     return Cart.reconstitute({
       id: CartId.fromString(cartRow.id),

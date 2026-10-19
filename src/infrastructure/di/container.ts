@@ -67,7 +67,12 @@ export const container = {
   authenticateUser: new AuthenticateUserUseCase(userRepository, passwordHasher),
   resolveSession: new ResolveSessionUseCase(sessionStore, userRepository),
   updateUserProfile: new UpdateUserProfileUseCase(userRepository, eventPublisher),
-  placeOrder: new PlaceOrderUseCase(orderRepository, cartRepository, productRepository, eventPublisher),
+  placeOrder: new PlaceOrderUseCase(
+    orderRepository,
+    cartRepository,
+    productRepository,
+    eventPublisher,
+  ),
   cancelOrder: new CancelOrderUseCase(orderRepository, productRepository, eventPublisher),
   listOrdersForBuyer: new ListOrdersForBuyerUseCase(orderRepository),
   listOrdersForVendor: new ListOrdersForVendorUseCase(orderRepository),

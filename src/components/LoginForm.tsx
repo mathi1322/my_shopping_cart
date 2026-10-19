@@ -45,7 +45,7 @@ export default function LoginForm({ onSuccess }: Props) {
 
   return (
     <form onSubmit={handleSubmit} class="mx-auto mt-10 max-w-sm rounded bg-white p-6 shadow-sm">
-      <h1 class="mb-4 font-heading text-xl font-bold text-slate-800">Login</h1>
+      <h1 class="font-heading mb-4 text-xl font-bold text-slate-800">Login</h1>
       {error && <p class="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
 
       <label class="mb-3 block text-sm">
@@ -73,14 +73,14 @@ export default function LoginForm({ onSuccess }: Props) {
       <button
         type="submit"
         disabled={loading}
-        class="w-full rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+        class="bg-brand hover:bg-brand-dark w-full rounded-full px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {loading ? 'Logging in…' : 'Login'}
       </button>
 
       <p class="mt-4 text-center text-sm text-slate-500">
         New here?{' '}
-        <a href="/register" class="font-medium text-brand hover:underline">
+        <a href="/register" class="text-brand font-medium hover:underline">
           Create an account
         </a>
       </p>

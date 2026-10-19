@@ -20,10 +20,10 @@ const user = Astro.locals.user;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title} · MediKart</title>
   </head>
-  <body class="min-h-full bg-page text-slate-900">
-    <header class="sticky top-0 z-10 bg-brand shadow-md">
+  <body class="bg-page min-h-full text-slate-900">
+    <header class="bg-brand sticky top-0 z-10 shadow-md">
       <div class="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-2.5 sm:gap-6 sm:py-2">
-        <a href="/" class="shrink-0 font-heading text-xl leading-tight font-bold text-white">
+        <a href="/" class="font-heading shrink-0 text-xl leading-tight font-bold text-white">
           Medi<span class="text-accent">Kart</span>
         </a>
 
@@ -33,7 +33,9 @@ const user = Astro.locals.user;
           method="get"
           class="order-3 w-full sm:order-2 sm:max-w-xl sm:flex-1"
         >
-          <div class="flex items-center rounded-full border-2 border-white/0 bg-white px-3 py-2 shadow-sm focus-within:border-accent">
+          <div
+            class="focus-within:border-accent flex items-center rounded-full border-2 border-white/0 bg-white px-3 py-2 shadow-sm"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 20 20"

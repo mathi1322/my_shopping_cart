@@ -138,7 +138,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
         <p class="text-lg font-medium text-slate-700">Your cart is empty</p>
         <a
           href="/"
-          class="mt-3 inline-block rounded-full bg-brand px-5 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+          class="bg-brand hover:bg-brand-dark mt-3 inline-block rounded-full px-5 py-2 text-sm font-semibold text-white"
         >
           Shop now
         </a>
@@ -180,7 +180,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                   <div>
                     <a
                       href={`/products/${item.productId}`}
-                      class="truncate font-medium text-slate-800 hover:text-brand hover:underline"
+                      class="hover:text-brand truncate font-medium text-slate-800 hover:underline"
                     >
                       {item.productName}
                     </a>
@@ -215,7 +215,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                     <button
                       onClick={() => removeItem(item.productId)}
                       disabled={isPending}
-                      class="text-sm font-semibold text-slate-500 uppercase hover:text-brand disabled:opacity-50"
+                      class="hover:text-brand text-sm font-semibold text-slate-500 uppercase disabled:opacity-50"
                     >
                       Remove
                     </button>
@@ -252,7 +252,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
         <button
           type="button"
           onClick={openCheckout}
-          class="mt-2 w-full rounded-full bg-brand px-4 py-3 text-sm font-bold tracking-wide text-white uppercase hover:bg-brand-dark"
+          class="bg-brand hover:bg-brand-dark mt-2 w-full rounded-full px-4 py-3 text-sm font-bold tracking-wide text-white uppercase"
         >
           Place Order
         </button>
@@ -270,9 +270,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
           >
             {checkoutStep === 'address' && (
               <form onSubmit={continueToConfirm}>
-                <h2 class="mb-4 font-heading text-lg font-bold text-slate-800">
-                  Delivery details
-                </h2>
+                <h2 class="font-heading mb-4 text-lg font-bold text-slate-800">Delivery details</h2>
                 <label class="mb-3 block text-sm">
                   <span class="mb-1 block font-medium text-slate-600">Delivery address</span>
                   <textarea
@@ -309,7 +307,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                   </button>
                   <button
                     type="submit"
-                    class="flex-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark"
+                    class="bg-brand hover:bg-brand-dark flex-1 rounded-full px-4 py-2 text-sm font-semibold text-white"
                   >
                     Continue
                   </button>
@@ -319,7 +317,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
 
             {checkoutStep === 'confirm' && (
               <div>
-                <h2 class="mb-4 font-heading text-lg font-bold text-slate-800">
+                <h2 class="font-heading mb-4 text-lg font-bold text-slate-800">
                   Confirm your order
                 </h2>
                 {checkoutError && (
@@ -367,7 +365,7 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
                     type="button"
                     disabled={placing}
                     onClick={placeOrder}
-                    class="flex-1 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+                    class="bg-brand hover:bg-brand-dark flex-1 rounded-full px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
                   >
                     {placing ? 'Placing…' : 'Confirm Order'}
                   </button>

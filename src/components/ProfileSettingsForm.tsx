@@ -66,7 +66,7 @@ export default function ProfileSettingsForm({
         <p class="mb-4 rounded bg-green-50 px-3 py-2 text-sm text-green-700">Profile saved.</p>
       )}
 
-      <h2 class="mb-3 font-heading text-sm font-bold text-gray-600 uppercase">Personal details</h2>
+      <h2 class="font-heading mb-3 text-sm font-bold text-gray-600 uppercase">Personal details</h2>
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label class="block text-sm sm:col-span-2">
           <span class="mb-1 block font-medium text-slate-600">Full name</span>
@@ -99,7 +99,7 @@ export default function ProfileSettingsForm({
 
       {isSeller && (
         <>
-          <h2 class="mt-6 mb-3 font-heading text-sm font-bold text-gray-600 uppercase">
+          <h2 class="font-heading mt-6 mb-3 text-sm font-bold text-gray-600 uppercase">
             Business details
           </h2>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -138,7 +138,7 @@ export default function ProfileSettingsForm({
       <button
         type="submit"
         disabled={saving}
-        class="mt-6 rounded-full bg-brand px-6 py-2 text-sm font-semibold text-white hover:bg-brand-dark disabled:opacity-60"
+        class="bg-brand hover:bg-brand-dark mt-6 rounded-full px-6 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {saving ? 'Saving…' : 'Save changes'}
       </button>
