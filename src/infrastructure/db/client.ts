@@ -1,5 +1,6 @@
 import postgres from 'postgres';
-import { drizzle } from 'drizzle-orm/postgres-js';
+import { drizzle, type PostgresJsQueryResultHKT } from 'drizzle-orm/postgres-js';
+import type { PgDatabase } from 'drizzle-orm/pg-core';
 import * as schema from './schema';
 
 function resolveConnectionString(): string {
@@ -13,4 +14,9 @@ function resolveConnectionString(): string {
 export const sql = postgres(resolveConnectionString());
 
 export const db = drizzle(sql, { schema });
-export type Database = typeof db;
+
+/**
+ * The query surface shared by `db` and a transaction handle, so repositories
+ * can be constructed on either — see DrizzleUnitOfWork.
+ */
+export type Database = PgDatabase<PostgresJsQueryResultHKT, typeof schema>;

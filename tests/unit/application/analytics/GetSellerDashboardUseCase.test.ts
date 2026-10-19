@@ -16,6 +16,7 @@ import { InMemoryProductRepository } from '../_fakes/InMemoryProductRepository';
 import { InMemoryCartRepository } from '../_fakes/InMemoryCartRepository';
 import { InMemoryOrderRepository } from '../_fakes/InMemoryOrderRepository';
 import { RecordingEventPublisher } from '../_fakes/RecordingEventPublisher';
+import { InMemoryUnitOfWork } from '../_fakes/InMemoryUnitOfWork';
 
 const seller = { id: 'seller-1', role: 'seller' as const };
 const otherSeller = { id: 'seller-2', role: 'seller' as const };
@@ -37,8 +38,9 @@ describe('GetSellerDashboardUseCase', () => {
     events = new RecordingEventPublisher();
     const getOrCreateCart = new GetOrCreateCartUseCase(carts);
     addItemToCart = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
-    placeOrder = new PlaceOrderUseCase(ordersRepo, carts, products, events);
-    cancelOrder = new CancelOrderUseCase(ordersRepo, products, events);
+    const unitOfWork = new InMemoryUnitOfWork({ carts, orders: ordersRepo, products });
+    placeOrder = new PlaceOrderUseCase(unitOfWork, carts, events);
+    cancelOrder = new CancelOrderUseCase(unitOfWork, events);
     getDashboard = new GetSellerDashboardUseCase(ordersRepo, products);
   });
 

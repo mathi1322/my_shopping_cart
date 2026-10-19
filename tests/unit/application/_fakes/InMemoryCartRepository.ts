@@ -13,6 +13,10 @@ export class InMemoryCartRepository implements CartRepository {
     return [...this.carts.values()].find((cart) => cart.userId === userId) ?? null;
   }
 
+  async findByUserIdForUpdate(userId: string): Promise<Cart | null> {
+    return this.findByUserId(userId);
+  }
+
   async save(cart: Cart): Promise<void> {
     this.carts.set(cart.id.toString(), cart);
   }

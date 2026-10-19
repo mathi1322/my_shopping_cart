@@ -6,6 +6,7 @@ import { DrizzleReviewRepository } from '../repositories/DrizzleReviewRepository
 import { DrizzleOrderRepository } from '../repositories/DrizzleOrderRepository';
 import { DrizzleSessionStore } from '../auth/DrizzleSessionStore';
 import { ScryptPasswordHasher } from '../auth/ScryptPasswordHasher';
+import { DrizzleUnitOfWork } from '../db/DrizzleUnitOfWork';
 import { ConsoleDomainEventPublisher } from '../../application/shared/DomainEventPublisher';
 import { CreateProductUseCase } from '../../application/product/CreateProductUseCase';
 import { UpdateProductUseCase } from '../../application/product/UpdateProductUseCase';
@@ -35,6 +36,7 @@ const orderRepository = new DrizzleOrderRepository(db);
 const sessionStore = new DrizzleSessionStore(db);
 const passwordHasher = new ScryptPasswordHasher();
 const eventPublisher = new ConsoleDomainEventPublisher();
+const unitOfWork = new DrizzleUnitOfWork(db);
 
 const getOrCreateCart = new GetOrCreateCartUseCase(cartRepository);
 
@@ -67,13 +69,8 @@ export const container = {
   authenticateUser: new AuthenticateUserUseCase(userRepository, passwordHasher),
   resolveSession: new ResolveSessionUseCase(sessionStore, userRepository),
   updateUserProfile: new UpdateUserProfileUseCase(userRepository, eventPublisher),
-  placeOrder: new PlaceOrderUseCase(
-    orderRepository,
-    cartRepository,
-    productRepository,
-    eventPublisher,
-  ),
-  cancelOrder: new CancelOrderUseCase(orderRepository, productRepository, eventPublisher),
+  placeOrder: new PlaceOrderUseCase(unitOfWork, cartRepository, eventPublisher),
+  cancelOrder: new CancelOrderUseCase(unitOfWork, eventPublisher),
   listOrdersForBuyer: new ListOrdersForBuyerUseCase(orderRepository),
   listOrdersForVendor: new ListOrdersForVendorUseCase(orderRepository),
   getSellerDashboard: new GetSellerDashboardUseCase(orderRepository, productRepository),

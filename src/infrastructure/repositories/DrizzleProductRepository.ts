@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, sql } from 'drizzle-orm';
 import type { Database } from '../db/client';
 import { products } from '../db/schema';
 import { Product } from '../../domain/product/Product';
@@ -73,6 +73,16 @@ export class DrizzleProductRepository implements ProductRepository {
     return row ? toDomain(row) : null;
   }
 
+  async findByIdForUpdate(id: ProductId): Promise<Product | null> {
+    const [row] = await this.db
+      .select()
+      .from(products)
+      .where(eq(products.id, id.toString()))
+      .limit(1)
+      .for('update');
+    return row ? toDomain(row) : null;
+  }
+
   async findAll(): Promise<Product[]> {
     const rows = await this.db.select().from(products).orderBy(products.createdAt);
     return rows.map(toDomain);
@@ -89,5 +99,22 @@ export class DrizzleProductRepository implements ProductRepository {
 
   async delete(id: ProductId): Promise<void> {
     await this.db.delete(products).where(eq(products.id, id.toString()));
+  }
+
+  async decrementStock(id: ProductId, quantity: number): Promise<boolean> {
+    // The stock check lives in the WHERE clause so check-and-decrement is a single atomic statement.
+    const updated = await this.db
+      .update(products)
+      .set({ stockQuantity: sql`${products.stockQuantity} - ${quantity}`, updatedAt: new Date() })
+      .where(and(eq(products.id, id.toString()), gte(products.stockQuantity, quantity)))
+      .returning({ id: products.id });
+    return updated.length > 0;
+  }
+
+  async incrementStock(id: ProductId, quantity: number): Promise<void> {
+    await this.db
+      .update(products)
+      .set({ stockQuantity: sql`${products.stockQuantity} + ${quantity}`, updatedAt: new Date() })
+      .where(eq(products.id, id.toString()));
   }
 }

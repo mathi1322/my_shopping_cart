@@ -2,6 +2,7 @@ import type { DomainEvent } from '../shared/DomainEvent';
 import type { CartId } from './CartId';
 import type { ProductId } from '../product/ProductId';
 import type { Quantity } from './Quantity';
+import type { Money } from '../shared/Money';
 
 export class CartItemAdded implements DomainEvent {
   readonly name = 'cart.item_added';
@@ -22,6 +23,17 @@ export class CartItemQuantityChanged implements DomainEvent {
     readonly cartId: CartId,
     readonly productId: ProductId,
     readonly quantity: Quantity,
+  ) {}
+}
+
+export class CartItemRepriced implements DomainEvent {
+  readonly name = 'cart.item_repriced';
+  readonly occurredAt = new Date();
+
+  constructor(
+    readonly cartId: CartId,
+    readonly productId: ProductId,
+    readonly unitPrice: Money,
   ) {}
 }
 

@@ -6,7 +6,13 @@ import { VendorId } from '../product/VendorId';
 import { CartId } from './CartId';
 import { CartItem } from './CartItem';
 import { Quantity } from './Quantity';
-import { CartItemAdded, CartItemQuantityChanged, CartItemRemoved, CartCleared } from './CartEvents';
+import {
+  CartItemAdded,
+  CartItemQuantityChanged,
+  CartItemRepriced,
+  CartItemRemoved,
+  CartCleared,
+} from './CartEvents';
 
 export interface AddItemInput {
   productId: ProductId;
@@ -106,6 +112,17 @@ export class Cart extends AggregateRoot {
     item.changeQuantity(quantity);
     this._updatedAt = new Date();
     this.addDomainEvent(new CartItemQuantityChanged(this._id, productId, quantity));
+  }
+
+  /** Updates an item's snapshotted price to the product's current price — done at checkout if the vendor changed it. */
+  repriceItem(productId: ProductId, unitPrice: Money): void {
+    const item = this.findItem(productId);
+    if (!item) {
+      throw new NotFoundError(`Product ${productId.toString()} is not in the cart`);
+    }
+    item.changeUnitPrice(unitPrice);
+    this._updatedAt = new Date();
+    this.addDomainEvent(new CartItemRepriced(this._id, productId, unitPrice));
   }
 
   removeItem(productId: ProductId): void {

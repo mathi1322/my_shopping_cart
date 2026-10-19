@@ -14,6 +14,10 @@ export class InMemoryProductRepository implements ProductRepository {
     return this.products.get(id.toString()) ?? null;
   }
 
+  async findByIdForUpdate(id: ProductId): Promise<Product | null> {
+    return this.findById(id);
+  }
+
   async findAll(): Promise<Product[]> {
     return [...this.products.values()];
   }
@@ -24,5 +28,23 @@ export class InMemoryProductRepository implements ProductRepository {
 
   async delete(id: ProductId): Promise<void> {
     this.products.delete(id.toString());
+  }
+
+  async decrementStock(id: ProductId, quantity: number): Promise<boolean> {
+    const product = this.products.get(id.toString());
+    if (!product || !product.hasStockFor(quantity)) {
+      return false;
+    }
+    product.updateDetails({ stockQuantity: product.stockQuantity - quantity });
+    product.pullDomainEvents();
+    return true;
+  }
+
+  async incrementStock(id: ProductId, quantity: number): Promise<void> {
+    const product = this.products.get(id.toString());
+    if (product) {
+      product.updateDetails({ stockQuantity: product.stockQuantity + quantity });
+      product.pullDomainEvents();
+    }
   }
 }

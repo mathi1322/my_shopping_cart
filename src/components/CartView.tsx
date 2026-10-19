@@ -116,6 +116,8 @@ export default function CartView({ initialAddress, initialPhone }: Props) {
       const data = await res.json();
       if (!res.ok) {
         setCheckoutError(data.error?.message ?? 'Could not place your order');
+        // A 409 may mean prices were refreshed server-side — reload so the buyer sees the new total.
+        if (res.status === 409) await loadCart();
         return;
       }
       window.dispatchEvent(new CustomEvent('cart:updated'));

@@ -51,6 +51,10 @@ export class CartItem {
     this.props.quantity = quantity;
   }
 
+  changeUnitPrice(unitPrice: Money): void {
+    this.props.unitPrice = unitPrice;
+  }
+
   increaseBy(quantity: Quantity): void {
     this.props.quantity = this.props.quantity.plus(quantity);
   }

@@ -72,13 +72,23 @@ export class DrizzleOrderRepository implements OrderRepository {
     return row ? this.hydrate(row) : null;
   }
 
+  async findByIdForUpdate(id: OrderId): Promise<Order | null> {
+    const [row] = await this.db
+      .select()
+      .from(orders)
+      .where(eq(orders.id, id.toString()))
+      .limit(1)
+      .for('update');
+    return row ? this.hydrate(row) : null;
+  }
+
   async findByBuyerId(buyerId: string): Promise<Order[]> {
     const rows = await this.db
       .select()
       .from(orders)
       .where(eq(orders.buyerId, buyerId))
       .orderBy(desc(orders.createdAt));
-    return Promise.all(rows.map((row) => this.hydrate(row)));
+    return this.hydrateMany(rows);
   }
 
   async findByVendorId(vendorId: VendorId): Promise<Order[]> {
@@ -101,23 +111,52 @@ export class DrizzleOrderRepository implements OrderRepository {
         ),
       )
       .orderBy(desc(orders.createdAt));
-    return Promise.all(rows.map((row) => this.hydrate(row)));
+    return this.hydrateMany(rows);
   }
 
   private async hydrate(row: OrderRow): Promise<Order> {
-    const itemRows = await this.db.select().from(orderItems).where(eq(orderItems.orderId, row.id));
-
-    return Order.reconstitute({
-      id: OrderId.fromString(row.id),
-      buyerId: row.buyerId,
-      buyerEmail: row.buyerEmail,
-      items: itemRows.map(itemToDomain),
-      deliveryAddress: row.deliveryAddress,
-      deliveryPhone: row.deliveryPhone,
-      paymentMethod: row.paymentMethod as PaymentMethod,
-      status: row.status as OrderStatus,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+    const [order] = await this.hydrateMany([row]);
+    return order;
   }
+
+  /** Loads every order's line items in one query rather than one query per order. */
+  private async hydrateMany(rows: OrderRow[]): Promise<Order[]> {
+    if (rows.length === 0) {
+      return [];
+    }
+
+    const itemRows = await this.db
+      .select()
+      .from(orderItems)
+      .where(
+        inArray(
+          orderItems.orderId,
+          rows.map((row) => row.id),
+        ),
+      );
+
+    const itemsByOrderId = new Map<string, OrderItemRow[]>();
+    for (const itemRow of itemRows) {
+      const items = itemsByOrderId.get(itemRow.orderId) ?? [];
+      items.push(itemRow);
+      itemsByOrderId.set(itemRow.orderId, items);
+    }
+
+    return rows.map((row) => toDomain(row, itemsByOrderId.get(row.id) ?? []));
+  }
+}
+
+function toDomain(row: OrderRow, itemRows: OrderItemRow[]): Order {
+  return Order.reconstitute({
+    id: OrderId.fromString(row.id),
+    buyerId: row.buyerId,
+    buyerEmail: row.buyerEmail,
+    items: itemRows.map(itemToDomain),
+    deliveryAddress: row.deliveryAddress,
+    deliveryPhone: row.deliveryPhone,
+    paymentMethod: row.paymentMethod as PaymentMethod,
+    status: row.status as OrderStatus,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  });
 }

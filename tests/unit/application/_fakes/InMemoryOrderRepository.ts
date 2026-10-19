@@ -14,6 +14,10 @@ export class InMemoryOrderRepository implements OrderRepository {
     return this.orders.get(id.toString()) ?? null;
   }
 
+  async findByIdForUpdate(id: OrderId): Promise<Order | null> {
+    return this.findById(id);
+  }
+
   async findByBuyerId(buyerId: string): Promise<Order[]> {
     return [...this.orders.values()].filter((order) => order.buyerId === buyerId);
   }

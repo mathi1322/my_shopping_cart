@@ -12,6 +12,8 @@ import { InMemoryProductRepository } from '../_fakes/InMemoryProductRepository';
 import { InMemoryCartRepository } from '../_fakes/InMemoryCartRepository';
 import { InMemoryOrderRepository } from '../_fakes/InMemoryOrderRepository';
 import { RecordingEventPublisher } from '../_fakes/RecordingEventPublisher';
+import { InMemoryUnitOfWork } from '../_fakes/InMemoryUnitOfWork';
+import { Money } from '@/domain/shared/Money';
 
 describe('Order use cases', () => {
   let products: InMemoryProductRepository;
@@ -34,8 +36,9 @@ describe('Order use cases', () => {
     events = new RecordingEventPublisher();
     const getOrCreateCart = new GetOrCreateCartUseCase(carts);
     addItemToCart = new AddItemToCartUseCase(carts, products, getOrCreateCart, events);
-    placeOrder = new PlaceOrderUseCase(ordersRepo, carts, products, events);
-    cancelOrder = new CancelOrderUseCase(ordersRepo, products, events);
+    const unitOfWork = new InMemoryUnitOfWork({ carts, orders: ordersRepo, products });
+    placeOrder = new PlaceOrderUseCase(unitOfWork, carts, events);
+    cancelOrder = new CancelOrderUseCase(unitOfWork, events);
     listOrdersForBuyer = new ListOrdersForBuyerUseCase(ordersRepo);
     listOrdersForVendor = new ListOrdersForVendorUseCase(ordersRepo);
   });
@@ -106,6 +109,38 @@ describe('Order use cases', () => {
         }),
       ).rejects.toThrow(ConflictError);
     });
+
+    it('refuses to place the order and reprices the cart when a price changed after add-to-cart', async () => {
+      const product = await seedProduct({ stockQuantity: 5, priceInCents: 89900 });
+      await addItemToCart.execute({ userId: buyerId, productId: product.id, quantity: 2 });
+
+      const reloaded = await products.findById(ProductId.fromString(product.id));
+      reloaded!.updateDetails({ price: Money.fromCents(99900) });
+      await products.save(reloaded!);
+
+      await expect(
+        placeOrder.execute({
+          buyerId,
+          buyerEmail: 'buyer@medikart.test',
+          deliveryAddress: '221B Baker Street',
+          deliveryPhone: '9876543210',
+        }),
+      ).rejects.toThrow(/price of "Digital Infrared Thermometer" has changed/);
+
+      const cart = await carts.findByUserId(buyerId);
+      expect(cart?.items[0].unitPrice.cents).toBe(99900);
+      expect((await products.findById(ProductId.fromString(product.id)))?.stockQuantity).toBe(5);
+      expect(await listOrdersForBuyer.execute(buyerId)).toHaveLength(0);
+
+      // Re-submitting after reviewing the cart goes through at the new price.
+      const order = await placeOrder.execute({
+        buyerId,
+        buyerEmail: 'buyer@medikart.test',
+        deliveryAddress: '221B Baker Street',
+        deliveryPhone: '9876543210',
+      });
+      expect(order.totalInCents).toBe(99900 * 2);
+    });
   });
 
   describe('CancelOrderUseCase', () => {
@@ -139,6 +174,25 @@ describe('Order use cases', () => {
       await expect(
         cancelOrder.execute({ orderId: order.id, requestingUserId: 'someone-else' }),
       ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('refuses a second cancel without restoring stock twice', async () => {
+      const product = await seedProduct({ stockQuantity: 5 });
+      await addItemToCart.execute({ userId: buyerId, productId: product.id, quantity: 2 });
+      const order = await placeOrder.execute({
+        buyerId,
+        buyerEmail: 'buyer@medikart.test',
+        deliveryAddress: '221B Baker Street',
+        deliveryPhone: '9876543210',
+      });
+
+      await cancelOrder.execute({ orderId: order.id, requestingUserId: buyerId });
+      await expect(
+        cancelOrder.execute({ orderId: order.id, requestingUserId: buyerId }),
+      ).rejects.toThrow(ConflictError);
+
+      const restoredProduct = await products.findById(ProductId.fromString(product.id));
+      expect(restoredProduct?.stockQuantity).toBe(5);
     });
   });
 

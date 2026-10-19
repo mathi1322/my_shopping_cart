@@ -28,11 +28,19 @@ async function seedProduct(overrides: Record<string, unknown> = {}) {
   return response.json();
 }
 
-async function addToCart(productId: string, quantity = 1) {
+async function addToCart(productId: string, quantity = 1, user: UserDto = buyer) {
   return callRoute(addItem, {
     request: jsonRequest('http://localhost/api/cart/items', 'POST', { productId, quantity }),
-    user: buyer,
+    user,
   });
+}
+
+async function fetchStock(productId: string): Promise<number> {
+  const response = await callRoute(getProduct, {
+    request: jsonRequest(`http://localhost/api/products/${productId}`, 'GET'),
+    params: { id: productId },
+  });
+  return (await response.json()).stockQuantity;
 }
 
 function placeOrderBody(overrides: Record<string, unknown> = {}) {
@@ -193,5 +201,90 @@ describe('Orders API', () => {
       user: buyer,
     });
     expect(response.status).toBe(403);
+  });
+
+  it('sells the last unit to exactly one of two buyers checking out at the same time', async () => {
+    const product = await seedProduct({ stockQuantity: 1 });
+    const otherBuyer = await seedTestUser(db, 'buyer');
+    await addToCart(product.id, 1, buyer);
+    await addToCart(product.id, 1, otherBuyer);
+
+    const responses = await Promise.all(
+      [buyer, otherBuyer].map((user) =>
+        callRoute(placeOrderRoute, {
+          request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
+          user,
+        }),
+      ),
+    );
+
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await fetchStock(product.id)).toBe(0);
+  });
+
+  it('places only one order when the same buyer submits checkout twice at once', async () => {
+    const product = await seedProduct({ stockQuantity: 5 });
+    await addToCart(product.id, 2);
+
+    const responses = await Promise.all(
+      [1, 2].map(() =>
+        callRoute(placeOrderRoute, {
+          request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
+          user: buyer,
+        }),
+      ),
+    );
+
+    expect(responses.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await fetchStock(product.id)).toBe(3);
+  });
+
+  it('restores stock only once when the same order is cancelled twice at once', async () => {
+    const product = await seedProduct({ stockQuantity: 5 });
+    await addToCart(product.id, 2);
+    const placeResponse = await callRoute(placeOrderRoute, {
+      request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
+      user: buyer,
+    });
+    const order = await placeResponse.json();
+
+    const responses = await Promise.all(
+      [1, 2].map(() =>
+        callRoute(cancelOrderRoute, {
+          request: jsonRequest(`http://localhost/api/orders/${order.id}/cancel`, 'POST'),
+          params: { id: order.id },
+          user: buyer,
+        }),
+      ),
+    );
+
+    expect(responses.map((r) => r.status).sort()).toEqual([200, 409]);
+    expect(await fetchStock(product.id)).toBe(5);
+  });
+
+  it('returns 409 and reprices the cart when the price changed since add-to-cart', async () => {
+    const product = await seedProduct({ stockQuantity: 5, priceInCents: 89900 });
+    await addToCart(product.id, 1);
+    await callRoute(updateProduct, {
+      request: jsonRequest(`http://localhost/api/products/${product.id}`, 'PUT', {
+        priceInCents: 99900,
+      }),
+      params: { id: product.id },
+      user: seller,
+    });
+
+    const rejected = await callRoute(placeOrderRoute, {
+      request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
+      user: buyer,
+    });
+    expect(rejected.status).toBe(409);
+    expect(await fetchStock(product.id)).toBe(5);
+
+    const accepted = await callRoute(placeOrderRoute, {
+      request: jsonRequest('http://localhost/api/orders', 'POST', placeOrderBody()),
+      user: buyer,
+    });
+    expect(accepted.status).toBe(201);
+    expect((await accepted.json()).totalInCents).toBe(99900);
   });
 });
